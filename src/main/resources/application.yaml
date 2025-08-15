@@ -1,0 +1,14 @@
+# 重载后注释将会消失
+database:
+  # 数据库地址
+  url: "jdbc:mysql://localhost:3306/quizdb?useSSL=false&serverTimezone=UTC"
+  # 数据库用户名
+  user: "root"
+  # 格式为 ENC(XXX),若不是则会在加载完成配置后自动加密
+  encrypted-password: "123123aa"
+crypto:
+  # 示例AES加密密钥 密钥字段必需是16字节的正整数倍
+  secret-key: "ltd25r3944realms"
+websocket:
+  url:
+  token:

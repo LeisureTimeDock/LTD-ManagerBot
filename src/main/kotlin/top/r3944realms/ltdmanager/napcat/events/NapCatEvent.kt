@@ -3,6 +3,13 @@ package top.r3944realms.ltdmanager.napcat.events
 import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
 import top.r3944realms.ltdmanager.napcat.events.account.AbstractAccountEvent
+import top.r3944realms.ltdmanager.napcat.events.file.AbstractFileEvent
+import top.r3944realms.ltdmanager.napcat.events.group.AbstractGroupEvent
+import top.r3944realms.ltdmanager.napcat.events.message.AbstractMessageEvent
+import top.r3944realms.ltdmanager.napcat.events.other.AbstractOtherEvent
+import top.r3944realms.ltdmanager.napcat.events.passkey.AbstractPassKeyEvent
+import top.r3944realms.ltdmanager.napcat.events.personal.AbstractPersonalEvent
+import top.r3944realms.ltdmanager.napcat.events.system.AbstractSystemEvent
 
 
 /**
@@ -23,6 +30,13 @@ abstract class NapCatEvent(
         private val eventTypeMap by lazy {
             mutableMapOf<String, KSerializer<out NapCatEvent>>().apply {
                 putAll(AbstractAccountEvent.eventTypeMap)
+                putAll(AbstractFileEvent.eventTypeMap)
+                putAll(AbstractOtherEvent.eventTypeMap)
+                putAll(AbstractPersonalEvent.eventTypeMap)
+                putAll(AbstractPassKeyEvent.eventTypeMap)
+                putAll(AbstractGroupEvent.eventTypeMap)
+                putAll(AbstractSystemEvent.eventTypeMap)
+                putAll(AbstractMessageEvent.eventTypeMap)
             }
         }
 
@@ -32,6 +46,20 @@ abstract class NapCatEvent(
                 // 如果是Account相关事件，使用AccountEvent的json配置
                 if (type.startsWith("account/")) {
                     AbstractAccountEvent.json.decodeFromString(serializer, jsonString)
+                } else if (type.startsWith("file/")) {
+                    AbstractFileEvent.json.decodeFromString(serializer, jsonString)
+                } else if (type.startsWith("group/")) {
+                    AbstractGroupEvent.json.decodeFromString(serializer, jsonString)
+                } else if (type.startsWith("message/")) {
+                    AbstractMessageEvent.json.decodeFromString(serializer, jsonString)
+                } else if (type.startsWith("passkey/")) {
+                    AbstractPassKeyEvent.json.decodeFromString(serializer, jsonString)
+                } else if (type.startsWith("personal/")) {
+                    AbstractPersonalEvent.json.decodeFromString(serializer, jsonString)
+                } else if (type.startsWith("system/")) {
+                    AbstractSystemEvent.json.decodeFromString(serializer, jsonString)
+                } else if (type.startsWith("other/")) {
+                    AbstractOtherEvent.json.decodeFromString(serializer, jsonString)
                 } else {
                     // 其他类型的事件可以使用默认的Json配置
                     val json = Json {

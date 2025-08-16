@@ -16,7 +16,7 @@ data class MarkMsgAsReadRequest (
      * 与user_id二选一
      */
     @SerialName("group_id")
-    val groupID: ID? = null,
+    val groupId: ID? = null,
 
     /**
      * 与group_id二选一

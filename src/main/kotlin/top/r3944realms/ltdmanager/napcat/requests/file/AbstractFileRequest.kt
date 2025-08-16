@@ -4,9 +4,9 @@ import kotlinx.serialization.Serializable
 import top.r3944realms.ltdmanager.napcat.requests.NapCatRequest
 
 @Serializable
-abstract class AbstractAccountRequest
+abstract class AbstractFileRequest
     : NapCatRequest() {
     override fun header(): String {
-        return "account"
+        return "file"
     }
 }

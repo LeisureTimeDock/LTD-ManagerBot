@@ -2,7 +2,6 @@ package top.r3944realms.ltdmanager.napcat.requests.account
 
 import kotlinx.serialization.Serializable
 import top.r3944realms.ltdmanager.napcat.Developing
-import top.r3944realms.ltdmanager.napcat.requests.NapCatRequest
 
 /**
  * 设置消息已读

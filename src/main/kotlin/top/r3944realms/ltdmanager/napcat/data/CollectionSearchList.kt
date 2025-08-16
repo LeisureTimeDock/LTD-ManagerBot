@@ -1,4 +1,10 @@
 package top.r3944realms.ltdmanager.napcat.data
 
-class CollectionSearchList {
-}
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class CollectionSearchList (
+    val bottomTimeStamp: String,
+    val collectionItemList: List<CollectionItemList>,
+    val hasMore: Boolean
+)

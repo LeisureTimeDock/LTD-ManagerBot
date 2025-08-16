@@ -9,7 +9,7 @@ import kotlinx.serialization.Transient
  * @property data 响应数据
  */
 @Serializable
-data class GetArkSharePeerEvent(
+data class ArkSharePeerEvent(
     @Transient
     val status0: Status = Status.Ok,
     @Transient

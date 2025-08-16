@@ -19,6 +19,6 @@ data class SetOnlineStatusEvent(
 
     val data: JsonElement? = null,
 ) : AbstractAccountEvent(status0, retcode0, message0, wording0, echo0) {
-    override fun subtype(): String = "/set_online_status"
+    override fun subtype(): String = "set_online_status"
 
 }

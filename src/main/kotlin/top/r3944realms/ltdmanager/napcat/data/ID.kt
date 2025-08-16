@@ -2,6 +2,9 @@ package top.r3944realms.ltdmanager.napcat.data
 
 import kotlinx.serialization.Serializable
 
+/**
+ * ID
+ */
 @Serializable
 sealed class ID {
     class DoubleValue(val value: Double) : ID()

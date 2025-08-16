@@ -5,7 +5,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import top.r3944realms.ltdmanager.napcat.data.FriendInfo
 
-data class GetFriendsWithCategory(
+@Serializable
+data class GetFriendsWithCategoryEvent(
     @Transient
     val status0: Status = Status.Ok,
     @Transient
@@ -19,7 +20,7 @@ data class GetFriendsWithCategory(
     val data: Datum
 
 ) : AbstractAccountEvent(status0, retcode0, message0, wording0, echo0) {
-    override fun subtype(): String = "/get_friends_with_category"
+    override fun subtype(): String = "get_friends_with_category"
     @Serializable
     data class Datum (
         /**

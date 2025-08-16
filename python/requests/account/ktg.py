@@ -1,7 +1,7 @@
 # ktg.py
 import sys
 sys.path.append("..")  # 添加父目录到模块搜索路径
-import KtEventGenerator as kg
+import KtRequestGenerator as kg
 def main():
     api_paths = [
         # 账号信息管理
@@ -48,6 +48,6 @@ def main():
         "/ArkShareGroup",       # 获取推荐群聊卡片
         "/get_mini_app_ark",    # 获取小程序卡片
     ]
-    kg.generateEventKt("account", "AbstractAccount", api_paths)
+    kg.generateRequestKt("account", "AbstractAccount", api_paths)
 if __name__ == "__main__":
     main()

@@ -9,6 +9,6 @@ def main():
         "/forward_group_single_msg",    # 转发单条消息到群
         "/group_poke"                   # 发送群聊戳一戳
     ]
-    kg.generateEventKt("message.group", "AbstractGroup", api_paths)
+    kg.generateEventKt("message.group", "AbstractMessage", api_paths)
 if __name__ == "__main__":
     main()

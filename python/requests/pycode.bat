@@ -8,7 +8,9 @@ cd ../message/personal
 python ktg.py
 cd ../group
 python ktg.py
-cd ../../personal
+cd ..
+python ktg.py
+cd ../personal
 python ktg.py
 cd ../passkey
 python ktg.py

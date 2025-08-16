@@ -5,7 +5,6 @@ import top.r3944realms.ltdmanager.napcat.events.NapCatEvent
 import top.r3944realms.ltdmanager.napcat.events.group.SetGroupPortraitEvent
 import top.r3944realms.ltdmanager.napcat.events.group.SetGroupSearchEvent
 import top.r3944realms.ltdmanager.napcat.events.personal.CanSendImageEvent
-import top.r3944realms.ltdmanager.napcat.requests.account.SetOnlineStatusRequest
 
 fun main() {
     val logger = LoggerFactory.getLogger("log")

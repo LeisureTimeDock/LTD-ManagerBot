@@ -5,7 +5,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import top.r3944realms.ltdmanager.napcat.data.ID
-import top.r3944realms.ltdmanager.napcat.requests.NapCatRequest
 
 /**
  * 设置消息已读

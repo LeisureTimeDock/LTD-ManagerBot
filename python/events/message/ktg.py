@@ -17,6 +17,6 @@ def main():
         "/get_image",               # 获取图片消息详情
         "/send_group_ai_record"     # 发送群AI语音
     ]
-    kg.generateEventKt("message", "AbstractGroup", api_paths)
+    kg.generateEventKt("message", "AbstractMessage", api_paths)
 if __name__ == "__main__":
     main()

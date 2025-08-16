@@ -13,7 +13,7 @@ import top.r3944realms.ltdmanager.napcat.data.ID
 @Serializable
 data class SetEssenceMsgRequest(
     @SerialName("message_id")
-    val messageID: ID
+    val messageId: ID
 ) : AbstractGroupRequest() {
     override fun toJSON(): String = Json.encodeToString(this)
 

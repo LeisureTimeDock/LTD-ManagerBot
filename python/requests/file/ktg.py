@@ -1,7 +1,7 @@
 # ktg.py
 import sys
 sys.path.append("..")  # 添加父目录到模块搜索路径
-import requests.KtRequestGenerator as kg
+import KtRequestGenerator as kg
 def main():
     api_paths = [
         "/move_group_file",               # 移动群文件

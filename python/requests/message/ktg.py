@@ -1,7 +1,7 @@
 # ktg.py
 import sys
 sys.path.append("..")  # 添加父目录到模块搜索路径
-import requests.KtRequestGenerator as kg
+import KtRequestGenerator as kg
 def main():
     api_paths = [
         "/send_poke",               # 发送戳一戳（通用版，可能同时适用于群和私聊）
@@ -17,6 +17,6 @@ def main():
         "/get_image",               # 获取图片消息详情
         "/send_group_ai_record"     # 发送群AI语音
     ]
-    kg.generateRequestKt("message", "AbstractGroup", api_paths)
+    kg.generateRequestKt("message", "AbstractMessage", api_paths)
 if __name__ == "__main__":
     main()

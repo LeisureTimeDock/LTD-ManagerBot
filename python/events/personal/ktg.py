@@ -12,7 +12,7 @@ def main():
         "/can_send_record",                 # 检查是否可以发送语音
         "/get_ai_characters",               # 获取AI语音人物
         "/click_inline_keyboard_button",    # 点击按钮
-        "/get_ai_record"                    # 获取AI语音
+        "/get_ai_record",                   # 获取AI语音
         "/set_input_status"                 # 设置输入状态
     ]
     kg.generateEventKt("personal", "AbstractPersonal", api_paths)

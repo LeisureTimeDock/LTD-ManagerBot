@@ -1,7 +1,7 @@
 # ktg.py
 import sys
 sys.path.append("..")  # 添加父目录到模块搜索路径
-import requests.KtRequestGenerator as kg
+import KtRequestGenerator as kg
 def main():
     api_paths = [
         "/ocr_image",                       # OCR 图片识别
@@ -12,7 +12,7 @@ def main():
         "/can_send_record",                 # 检查是否可以发送语音
         "/get_ai_characters",               # 获取AI语音人物
         "/click_inline_keyboard_button",    # 点击按钮
-        "/get_ai_record"                    # 获取AI语音
+        "/get_ai_record",                   # 获取AI语音
         "/set_input_status"                 # 设置输入状态
     ]
     kg.generateRequestKt("personal", "AbstractPersonal", api_paths)

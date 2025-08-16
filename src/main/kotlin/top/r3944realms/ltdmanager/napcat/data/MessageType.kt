@@ -14,5 +14,9 @@ enum class MessageType(val value: String) {
     @SerialName("record") Record("record"),
     @SerialName("reply") Reply("reply"),
     @SerialName("text") Text("text"),
-    @SerialName("video") Video("video");
+    @SerialName("video") Video("video"),
+    @SerialName("music") Music("music"),
+    @SerialName("dice") Dice("dice"),
+    @SerialName("rps") Rps("rps"),
+    @SerialName("node") Node("node");
 }

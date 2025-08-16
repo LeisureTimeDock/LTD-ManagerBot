@@ -10,7 +10,7 @@ import kotlinx.serialization.json.Json
  */
 @Serializable
 class MarkAllAsReadRequest: AbstractAccountRequest() {
-    override fun toJSON(): String = Json.encodeToString(this)
+    override fun toJSON(): String = "{}"
 
     override fun path(): String = "/_mark_all_as_read"
 }

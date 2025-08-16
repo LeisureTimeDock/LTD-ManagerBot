@@ -12,7 +12,7 @@ import top.r3944realms.ltdmanager.napcat.Developing
 @Developing
 @Serializable
 class GetUnidirectionalFriendListRequest: AbstractAccountRequest() {
-    override fun toJSON(): String = Json.encodeToString(this)
+    override fun toJSON(): String = "{}"
 
     override fun path(): String = "/get_unidirectional_friend_list"
 }

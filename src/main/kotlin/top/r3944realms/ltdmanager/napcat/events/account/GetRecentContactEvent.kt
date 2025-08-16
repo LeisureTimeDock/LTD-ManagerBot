@@ -5,7 +5,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import top.r3944realms.ltdmanager.napcat.data.MessageType
-import top.r3944realms.ltdmanager.napcat.data.Qq
+import top.r3944realms.ltdmanager.napcat.data.QQ
 import top.r3944realms.ltdmanager.napcat.data.Sender
 
 /**
@@ -165,8 +165,8 @@ data class GetRecentContactEvent(
     data class Data (
         val text: String? = null,
         val name: String? = null,
-        val qq: Qq? = null,
-        val id: Qq? = null,
+        val qq: QQ? = null,
+        val id: QQ? = null,
         val file: String? = null,
 
         /**

@@ -111,16 +111,18 @@ class RconPlayerListModule(
                                     CmdUtil.runExeCommand(rconPath, "-c", rconConfigPath, "-T", (timeout / 1000).toString() + "s", "forge tps")
                                 }.getOrElse { ex ->
                                     LoggerUtil.logger.warn("[$name] 执行 forge tps 失败: ${ex.message}")
-                                    ""
+                                    throw ex
                                 }
 
                                 val listOutput = runCatching {
                                     CmdUtil.runExeCommand(rconPath, "-c", rconConfigPath, "-T", (timeout / 1000).toString() + "s", "list")
                                 }.getOrElse { ex ->
                                     LoggerUtil.logger.warn("[$name] 执行 list 失败: ${ex.message}")
-                                    ""
+                                    throw ex
                                 }
-
+                                if (tpsOutput.contains("i/o timeout") || listOutput.contains("i/o timeout")) {
+                                    throw TimeoutException()
+                                }
                                 // 合并输出，再解析
                                 buildString {
                                     appendLine(tpsOutput.trim())
@@ -129,9 +131,11 @@ class RconPlayerListModule(
                                 }
                             } .onFailure { ex ->
                                 if (ex is TimeoutException) {
+                                    lastSuccessTime = now // ✅ 成功后记录冷却开始时间
                                     LoggerUtil.logger.warn("[$name] RCON 连接超时: ${ex.message}")
                                     sendFailedMessage(napCatClient, triggerMsg.realId, triggerMsg.time)
                                 } else {
+                                    lastSuccessTime = now // ✅ 成功后记录冷却开始时间
                                     LoggerUtil.logger.error("[$name] RCON 命令执行失败", ex)
                                     sendFailedMessage(
                                         napCatClient,

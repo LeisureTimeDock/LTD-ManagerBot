@@ -15,5 +15,5 @@ data class Sender (
     val sex: SexV2? = null,
 
     @SerialName("user_id")
-    val userID: Double
+    val userId: Long
 )

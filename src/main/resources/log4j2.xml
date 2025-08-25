@@ -1,36 +1,62 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Configuration status="WARN">
-    <!-- 定义日志格式 -->
-    <Properties>
-        <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss} [%t] %-5level %logger{36} - %msg%n</Property>
-        <Property name="LOG_FILE">logs/app.log</Property>
-    </Properties>
-
-    <!-- 定义 Appenders -->
     <Appenders>
+
         <!-- 控制台输出 -->
         <Console name="Console" target="SYSTEM_OUT">
-            <PatternLayout pattern="${LOG_PATTERN}" />
+            <PatternLayout pattern="[%d{yyyy-MM-dd HH:mm:ss}] [%t] %-5level %logger{36} - %msg%n"/>
         </Console>
 
-        <!-- 文件输出 -->
-        <File name="File" fileName="${LOG_FILE}">
-            <PatternLayout pattern="${LOG_PATTERN}" />
-        </File>
+        <!-- DEBUG 日志文件 -->
+        <RollingFile name="DebugFile" fileName="logs/debug.log"
+                     filePattern="logs/debug-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout>
+                <pattern>[%d{yyyy-MM-dd HH:mm:ss}] %-5level %logger{36} - %msg%n</pattern>
+            </PatternLayout>
+            <Policies>
+                <!-- 每天滚动 -->
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <!-- 文件超过 50MB 也滚动 -->
+                <SizeBasedTriggeringPolicy size="50 MB"/>
+            </Policies>
+            <!-- 保留 7 天 -->
+            <DefaultRolloverStrategy max="7" fileIndex="min"/>
+            <Filters>
+                <!-- 只接受 DEBUG 日志 -->
+                <ThresholdFilter level="DEBUG" onMatch="ACCEPT" onMismatch="DENY"/>
+            </Filters>
+        </RollingFile>
+
+        <!-- INFO 日志文件 -->
+        <RollingFile name="InfoFile" fileName="logs/info.log"
+                     filePattern="logs/info-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout>
+                <pattern>[%d{yyyy-MM-dd HH:mm:ss}] %-5level %logger{36} - %msg%n</pattern>
+            </PatternLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="50 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="7" fileIndex="min"/>
+            <Filters>
+                <!-- 只接受 INFO 及以上（但排除 DEBUG） -->
+                <ThresholdFilter level="INFO" onMatch="ACCEPT" onMismatch="DENY"/>
+            </Filters>
+        </RollingFile>
+
     </Appenders>
 
-    <!-- 定义日志记录规则 -->
     <Loggers>
-        <!-- 应用程序日志 -->
-        <Logger name="com.example" level="debug" additivity="false">
-            <AppenderRef ref="Console" />
-            <AppenderRef ref="File" />
+        <!-- 专门给 LTDManagerBot 配置 -->
+        <Logger name="LTDManagerBot" level="debug" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="DebugFile"/>
+            <AppenderRef ref="InfoFile"/>
         </Logger>
 
-        <!-- Root 日志 -->
-        <Root level="info">
-            <AppenderRef ref="Console" />
-            <AppenderRef ref="File" />
+        <!-- root logger（其他库） -->
+        <Root level="warn">
+            <AppenderRef ref="Console"/>
         </Root>
     </Loggers>
 </Configuration>

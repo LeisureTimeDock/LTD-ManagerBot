@@ -1,1 +1,7 @@
-# 基于NapCat Websocket Server 框架开发
+# 基于NapCat Http/Websocket Server API开发
+## 目标1：实现白名单申请通过后加群自动通过
+### 拆分目标：
+轮询
+1. 获取指定加群请求
+2. 对比数据库中的以通过QQ号
+3. 批量通过/拒绝请求

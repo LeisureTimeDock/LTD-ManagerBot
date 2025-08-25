@@ -1,0 +1,12 @@
+package top.r3944realms.ltdmanager.napcat.request.other
+
+import kotlinx.serialization.Serializable
+import top.r3944realms.ltdmanager.napcat.request.NapCatRequest
+
+@Serializable
+abstract class AbstractOtherRequest
+    : NapCatRequest() {
+    override fun header(): String {
+        return "other"
+    }
+}

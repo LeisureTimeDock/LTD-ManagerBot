@@ -1,56 +1,73 @@
 package top.r3944realms.ltdmanager.utils
 
-import org.yaml.snakeyaml.DumperOptions
-import org.yaml.snakeyaml.Yaml
-import java.io.FileInputStream
-import java.io.FileWriter
-import java.io.IOException
+import org.snakeyaml.engine.v2.api.Dump
+import org.snakeyaml.engine.v2.api.DumpSettings
+import org.snakeyaml.engine.v2.api.Load
+import org.snakeyaml.engine.v2.api.LoadSettings
+import org.snakeyaml.engine.v2.common.FlowStyle
+import org.snakeyaml.engine.v2.nodes.*
+import java.nio.file.Files
+import java.nio.file.NoSuchFileException
+import java.nio.file.Paths
 
 object YamlUpdater {
     /**
-     * 更新 YAML 文件字段值，保留原始格式
-     * @param filePath     YAML 文件路径
-     * @param keyPath     层级字段路径（如 "database.url"）
-     * @param newValue    新值
+     * 更新 YAML 文件字段值（不保留注释）
+     * @param filePath  YAML 文件路径
+     * @param keyPath   层级字段路径（如 "database.url"）
+     * @param newValue  新值
      */
-    @Throws(IOException::class)
-    fun updateYamlValue(filePath: String, keyPath: String, newValue: String) {
-        // 1. 读取原始 YAML 文件
-        // 标准化路径
-        val normalizedPath = filePath.replaceFirst("^/(.:/)".toRegex(), "$1") // 修复Windows路径
-        val yaml = Yaml()
-        val yamlData: Map<String, Any>
-        FileInputStream(normalizedPath).use { inputStream ->
-            yamlData = yaml.load(inputStream)
+    @Throws(Exception::class)
+    fun updateYaml(filePath: String, keyPath: String, newValue: Any?) {
+        val normalizedPath = normalizePath(filePath)
+        val content = try {
+            Files.readString(Paths.get(normalizedPath))
+                .takeIf { it.isNotBlank() }
+                ?: throw IllegalStateException("YAML 文件为空")
+        } catch (e: NoSuchFileException) {
+            throw IllegalStateException("文件不存在: $normalizedPath")
         }
 
-        // 2. 更新嵌套 Map 中的值
-        updateNestedValue(yamlData, keyPath.split("\\.".toRegex()).toTypedArray(), 0, newValue)
+        val settings = LoadSettings.builder()
+            .setLabel("YAML 配置文件")
+            .build()
 
-        // 3. 配置 YAML 输出格式（保留原始风格）
-        val options = DumperOptions().apply {
-            defaultFlowStyle = DumperOptions.FlowStyle.FLOW // 使用 {} 风格
-            indent = 2 // 缩进2空格
-            isPrettyFlow = true // 保持可读性
+        val loader = Load(settings)
+        val parsed = loader.loadFromString(content)
+
+        if (parsed !is MutableMap<*, *>) {
+            throw IllegalStateException("文档根节点必须是 Map，实际是: ${parsed?.javaClass?.name}")
         }
 
-        // 4. 写回文件
-        FileWriter(normalizedPath).use { writer ->
-            Yaml(options).dump(yamlData, writer)
-        }
+        @Suppress("UNCHECKED_CAST")
+        val root = parsed as MutableMap<String, Any?>
+
+        // 更新节点
+        updateMap(root, keyPath.split('.'), newValue)
+
+        // 保存
+        val dumpSettings = DumpSettings.builder()
+            .setDefaultFlowStyle(FlowStyle.BLOCK)
+            .setIndent(2)
+            .setWidth(120)
+            .build()
+
+        Files.writeString(Paths.get(normalizedPath), Dump(dumpSettings).dumpToString(root))
     }
-    private fun updateNestedValue(map: Map<String, Any>, keys: Array<String>, index: Int, newValue: Any) {
-        if (index == keys.size - 1) {
-            (map as MutableMap<String, Any>)[keys[index]] = newValue // 更新最终字段
+
+    private fun updateMap(map: MutableMap<String, Any?>, keys: List<String>, value: Any?) {
+        if (keys.size == 1) {
+            map[keys[0]] = value
         } else {
-            val nested = map[keys[index]]
-            if (nested is Map<*, *>) {
-                @Suppress("UNCHECKED_CAST")
-                val nestedMap = nested as Map<String, Any>
-                updateNestedValue(nestedMap, keys, index + 1, newValue)
-            } else {
-                throw IllegalArgumentException("Invalid YAML path: ${keys.joinToString(".")}")
+            val child = map[keys[0]]
+            if (child !is MutableMap<*, *>) {
+                throw IllegalArgumentException("Invalid path: ${keys[0]}")
             }
+            @Suppress("UNCHECKED_CAST")
+            updateMap(child as MutableMap<String, Any?>, keys.drop(1), value)
         }
     }
+    private fun normalizePath(path: String): String =
+        path.replace("^/([A-Za-z]:/)".toRegex(), "$1")
 }
+

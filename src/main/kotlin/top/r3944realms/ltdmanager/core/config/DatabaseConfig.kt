@@ -2,7 +2,6 @@ package top.r3944realms.ltdmanager.core.config
 
 import top.r3944realms.ltdmanager.utils.CryptoUtil
 import top.r3944realms.ltdmanager.utils.YamlUpdater
-import java.util.*
 
 data class DatabaseConfig(
     var url: String? = null,
@@ -37,12 +36,8 @@ data class DatabaseConfig(
         }
         try {
             encryptedPassword = "ENC(${CryptoUtil.encrypt(encryptedPassword!!)})"
-            YamlUpdater.updateYamlValue(
-                Objects.requireNonNull(
-                    YamlConfigLoader::class.java
-                        .classLoader
-                        .getResource("application.yaml")
-                ).path,
+            YamlUpdater.updateYaml(
+                YamlConfigLoader.configFilePath.toString(),
                 "database.encrypted-password",
                 this.encryptedPassword!!
             )
@@ -54,7 +49,7 @@ data class DatabaseConfig(
     /**
      * 检查密码是否已加密
      */
-    fun isEncrypted(): Boolean {
+    private fun isEncrypted(): Boolean {
         return encryptedPassword != null &&
                 encryptedPassword!!.startsWith("ENC(") &&
                 encryptedPassword!!.endsWith(")")

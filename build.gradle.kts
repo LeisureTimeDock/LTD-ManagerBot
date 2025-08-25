@@ -1,15 +1,19 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 plugins {
     kotlin("jvm") version "1.9.23"
     kotlin("plugin.serialization") version "1.9.23" // 添加序列化插件
     application
+    id("com.github.johnrengelman.shadow") version "8.0.0" // fat jar
 }
 
-group = "top.r3944realms.ltdmanager"
-version = "1.0-SNAPSHOT"
+group = project.property("project_group") as String
+version = project.property("project_version") as String
 
 repositories {
 
     repositories {
+        gradlePluginPortal()
         mavenLocal()
         maven {
             url = uri("https://maven.aliyun.com/repository/public/")
@@ -42,7 +46,8 @@ repositories {
         implementation("org.apache.logging.log4j:log4j-api:2.20.0")
 
         // 配置管理
-        implementation("org.yaml:snakeyaml:2.2")
+        implementation("org.yaml:snakeyaml:2.4")
+        implementation("org.snakeyaml:snakeyaml-engine:2.10")
         implementation("com.typesafe:config:1.4.2") // 类型安全的配置库
 
         // 协程
@@ -60,6 +65,21 @@ repositories {
         jvmToolchain(17)
     }
     application {
-        mainClass.set("top.r3944realms.ltdmanager.main") // 设置主类
+        mainClass.set("top.r3944realms.ltdmanager.MainKt") // 设置主类
+    }
+}
+tasks {
+    // ShadowJar 配置
+    named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
+        archiveClassifier.set("") // 去掉 -all 后缀
+        mergeServiceFiles()
+        manifest {
+            attributes["Main-Class"] = "top.r3944realms.ltdmanager.MainKt"
+        }
+    }
+
+    // build 依赖 shadowJar
+    build {
+        dependsOn("shadowJar")
     }
 }

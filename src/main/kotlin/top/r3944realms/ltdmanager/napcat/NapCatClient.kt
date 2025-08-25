@@ -1,134 +1,200 @@
 package top.r3944realms.ltdmanager.napcat
 
 import io.ktor.client.*
+import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.websocket.*
-import io.ktor.websocket.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import io.ktor.utils.io.core.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import org.slf4j.LoggerFactory
-import top.r3944realms.ltdmanager.napcat.events.NapCatEvent
-import top.r3944realms.ltdmanager.napcat.requests.NapCatRequest
-import top.r3944realms.ltdmanager.napcat.requests.PrioritizedRequest
-import top.r3944realms.ltdmanager.napcat.requests.PriorityMessageQueue
-import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.sync.withPermit
+import top.r3944realms.ltdmanager.core.config.YamlConfigLoader
+import top.r3944realms.ltdmanager.napcat.event.NapCatEvent
+import top.r3944realms.ltdmanager.napcat.request.NapCatRequest
+import top.r3944realms.ltdmanager.utils.Environment
+import top.r3944realms.ltdmanager.utils.LoggerUtil
+import java.util.*
+import kotlin.collections.ArrayDeque
+import kotlin.collections.isNotEmpty
+import kotlin.time.Duration.Companion.seconds
 
-class NapCatClient(private val wsUrl: String, private val token: String) {
-    private val client = HttpClient(CIO) { install(WebSockets) }
+class NapCatClient private constructor() : Closeable {
+    private val client = HttpClient(CIO)
+    private val httpConfig = YamlConfigLoader.loadHttpConfig()
+    private val token = httpConfig.decryptedToken
+
+    // 限流 (同时最多 3 个请求)
+    private val semaphore = Semaphore(3)
+
+    // 普通优先级队列
+    private val requestQueue = PriorityQueue<QueueItem>(compareBy { it.priority })
+    private val queueMutex = Mutex()
+
+    // 紧急队列 (先进先出，最多 10 个)
+    private val urgentQueue = ArrayDeque<QueueItem>(10)
+
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val logger = LoggerFactory.getLogger(NapCatClient::class.java)
 
-    // 请求-响应匹配队列（FIFO）
-    private val pendingResponses = Channel<CompletableDeferred<NapCatEvent>>(capacity = Channel.UNLIMITED)
-    private val mutex = Mutex()
-
-    // 事件通道（用于非请求响应的消息）
-    // 优先级队列（按优先级发送请求）
-    private val priorityQueue = PriorityMessageQueue()
-    private val eventChannel = Channel<NapCatEvent>(capacity = Channel.UNLIMITED)
-    private val _connectionState = MutableStateFlow(false)
-    val connectionState = _connectionState.asStateFlow()
-
-    // 子协程引用
-    private var receiverJob: Job? = null
-    private var senderJob: Job? = null
-
-    suspend fun start() {
-        receiverJob = scope.launch { launchReceiver() }
-        senderJob = scope.launch { launchSender() }
-    }
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private suspend fun launchReceiver() {
-        try {
-            client.wss(
-                host = wsUrl.removePrefix("ws://").substringBefore(':'),
-                port = wsUrl.substringAfterLast(':').toInt(),
-                path = "/"
-            ) {
-                send(Frame.Text("""{"token":"$token"}"""))
-                _connectionState.value = true
-
-                while (true) {
-                        when (val frame = incoming.receive()) {
-                        is Frame.Text -> {
-                            val event = Json.decodeFromString<NapCatEvent>(frame.readText())
-                            // 尝试匹配最近的请求
-                            if (!pendingResponses.isEmpty) {
-                                pendingResponses.tryReceive().getOrNull()?.complete(event)
-                            } else {
-                                eventChannel.send(event) // 非请求响应的消息
-                            }
-                        }
-                        is Frame.Close -> break
-                        else -> {}
+    init {
+        scope.launch {
+            while (isActive) {
+                val item = queueMutex.withLock {
+                    when {
+                        urgentQueue.isNotEmpty() -> urgentQueue.removeFirst()
+                        requestQueue.isNotEmpty() -> requestQueue.poll()
+                        else -> null
                     }
                 }
-            }
-        } finally {
-            _connectionState.value = false
-            pendingResponses.close()
-            eventChannel.close()
-            priorityQueue.close()
-        }
-    }
-    private suspend fun launchSender() {
-        while (coroutineContext.isActive) {
-            try {
-                // 从优先级队列取出请求（自动按优先级排序）
-                val prioritized = priorityQueue.dequeue()
-                val request = prioritized.request
 
-                // 发送前注册响应监听器
-                val deferred = CompletableDeferred<NapCatEvent>()
-                mutex.withLock {
-                    pendingResponses.send(deferred)
+                if (item == null) {
+                    // 队列空 -> 挂起一小段时间等待新任务
+                    delay(20)
+                    continue
                 }
 
-                // 发送请求
-                client.webSocketSession(wsUrl).send(Frame.Text(Json.encodeToString(request)))
-
-                // 等待响应（超时由外层 sendRequest 控制）
-                deferred.await()
-            } catch (e: Exception) {
-                logger.error("发送请求失败", e)
-                delay(1000) // 错误时暂停1秒
+                processRequest(item)
             }
         }
+    }
+    /**
+     * 普通发送 (带优先级) 无返回事件版本
+     * 适用于只需要发送请求，不关心返回结果的情况，例如 SetGroupAddRequestRequest
+     */
+    suspend fun sendUnit(
+        request: NapCatRequest,
+        retries: Int = 3,
+        priority: Int = 5
+    ) {
+        checkRequest(request)
+        val deferred = CompletableDeferred<Unit>()
+        queueMutex.withLock {
+            requestQueue.add(QueueItem(request, deferred, retries, priority, expectsEvent = false))
+        }
+        deferred.await()
     }
 
     /**
-     * 发送带优先级的请求
-     * @param priority 优先级（HIGH_PRIORITY/DEFAULT_PRIORITY/LOW_PRIORITY）
-     * @param timeout 超时时间（毫秒）
+     * 紧急发送 (先进先出, 最多 10 个) 无返回事件版本
      */
-    suspend fun sendRequest(
+    @Throws(IllegalStateException::class)
+    suspend fun sendUrgentUnit(
         request: NapCatRequest,
-        priority: Int = PrioritizedRequest.DEFAULT_PRIORITY,
-        timeout: Long = 5000
-    ): NapCatEvent = withTimeout(timeout) {
-        val deferred = CompletableDeferred<NapCatEvent>()
-        // 将请求加入优先级队列
-        priorityQueue.enqueue(PrioritizedRequest(request, priority))
-        deferred.await() // 等待响应（由 launchSender 和 launchReceiver 协作完成）
+        retries: Int = 3
+    ) {
+        checkRequest(request)
+        val deferred = CompletableDeferred<Unit>()
+        queueMutex.withLock {
+            if (urgentQueue.size >= 10) {
+                throw IllegalStateException("紧急任务队列已满 (最多 10 个)")
+            }
+            urgentQueue.addLast(QueueItem(request, deferred, retries, priority = Int.MIN_VALUE, expectsEvent = false))
+        }
+        deferred.await()
     }
 
-    val incomingEvents: ReceiveChannel<NapCatEvent> = eventChannel
-    private fun cleanup() {
-        _connectionState.value = false
-        pendingResponses.close()
-        eventChannel.close()
-        priorityQueue.close()
+    /**
+     * 普通发送 (带优先级)
+     */
+    suspend fun <T : NapCatEvent> send(
+        request: NapCatRequest,
+        retries: Int = 3,
+        priority: Int = 5
+    ): T {
+        checkRequest(request)
+        val deferred = CompletableDeferred<T>()
+        queueMutex.withLock {
+            requestQueue.add(QueueItem(request, deferred, retries, priority, expectsEvent = true))
+        }
+        return deferred.await()
     }
-    fun close() {
-        scope.cancel("NapCatClient closed")
-        cleanup()
+
+    /**
+     * 紧急发送 (先进先出, 最多 10 个)
+     */
+    @Throws(IllegalStateException::class)
+    suspend fun <T : NapCatEvent> sendUrgent(
+        request: NapCatRequest,
+        retries: Int = 3
+    ): T {
+        checkRequest(request)
+        val deferred = CompletableDeferred<T>()
+        queueMutex.withLock {
+            if (urgentQueue.size >= 10) {
+                throw IllegalStateException("紧急任务队列已满 (最多 10 个)")
+            }
+            urgentQueue.addLast(QueueItem(request, deferred, retries, priority = Int.MIN_VALUE, expectsEvent = true))
+        }
+        return deferred.await()
+    }
+    private fun checkRequest(request: NapCatRequest) {
+        // 如果请求类标记为 @Developing，则抛出异常
+        if (request::class.annotations.any { it.annotationClass == Developing::class }) {
+            throw UnsupportedOperationException(
+                "请求类 ${request::class.simpleName} 标记为 @Developing，不支持发送"
+            )
+        }
+
+    }
+
+    private suspend fun processRequest(item: QueueItem) {
+        semaphore.withPermit {
+            val (request, deferred, retries, _, expectsEvent) = item
+            var attempt = 0
+            var lastError: Throwable? = null
+
+            while (attempt < retries) {
+                try {
+                    val apiUrl = URLBuilder(httpConfig.url.toString()).apply {
+                        encodedPath += request.path()
+                    }.build()
+
+                    if(!Environment.isProduction()) LoggerUtil.logger.debug("发送请求: ${request.toJSON()}")
+
+                    val response = client.post(apiUrl) {
+                        contentType(ContentType.Application.Json)
+                        header("Authorization", "Bearer $token")
+                        setBody(request.toJSON())
+                    }
+
+                    if (!response.status.isSuccess()) {
+                        throw IllegalStateException("请求失败: HTTP ${response.status}")
+                    }
+                    if (response.contentType()?.match(ContentType.Application.Json) != true && expectsEvent) {
+                        throw IllegalStateException("请求失败: 响应类型不是 JSON (${response.contentType()})")
+                    }
+
+                    val jsonText: String = response.body()
+                    if(!Environment.isProduction()) LoggerUtil.logger.debug("响应: $jsonText")
+                    if (expectsEvent) {
+                        val event = NapCatEvent.decodeEvent(jsonText, request.type())
+                        @Suppress("UNCHECKED_CAST")
+                        (deferred as CompletableDeferred<NapCatEvent>).complete(event)
+                    } else {
+                        @Suppress("UNCHECKED_CAST")
+                        (deferred as CompletableDeferred<Unit>).complete(Unit)
+                    }
+                    return
+                } catch (e: Exception) {
+                    lastError = e
+                    LoggerUtil.logger.warn("请求失败, 第 ${attempt + 1} 次: ${e.message}")
+                    delay(((attempt + 1) * 2L).seconds) // 指数退避
+                }
+                attempt++
+            }
+
+            deferred.completeExceptionally(lastError ?: RuntimeException("未知错误"))
+        }
+    }
+
+    override fun close() {
+        scope.cancel()
+        runBlocking { client.close() }
+    }
+
+    companion object {
+        fun create(): NapCatClient = NapCatClient()
     }
 }

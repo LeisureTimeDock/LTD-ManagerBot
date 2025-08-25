@@ -5,22 +5,50 @@ import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.Constructor
 import org.yaml.snakeyaml.introspector.Property
 import org.yaml.snakeyaml.introspector.PropertyUtils
+import top.r3944realms.ltdmanager.utils.ConfigInitializer
 import top.r3944realms.ltdmanager.utils.NamingConventionUtil
+import java.nio.file.Files
+import java.nio.file.Paths
 
 object YamlConfigLoader {
-    private val config: ConfigWrapper = loadConfig().also {
-        ensureConfigEncrypted(it) // 初始化后立即加密
+    val configFilePath = Paths.get("config/application.yaml") // 配置文件路径
+    private val _config by lazy { loadConfig() } // 延迟初始化
+    val config: ConfigWrapper get() = _config
+
+    init {
+        // 第一次启动确保配置文件存在
+        ConfigInitializer.initConfig("application.yaml", "config")
+
+        // 初始化后加密（确保只执行一次）
+        runCatching {
+            _config.database.encryptPassword()
+            _config.websocket.encryptToken()
+            _config.http.encryptToken()
+        }.onFailure { e ->
+            println("初始化加密失败: ${e.message}")
+            e.printStackTrace()
+        }
     }
     private fun ensureConfigEncrypted(config: ConfigWrapper?) {
         config?.database?.encryptPassword()
+        config?.websocket?.encryptToken()
+        config?.http?.encryptToken()
     }
     private fun loadConfig(): ConfigWrapper {
-        YamlConfigLoader::class.java.classLoader.getResourceAsStream("application.yaml").use { inputStream ->
-            if (inputStream == null) {
-                throw RuntimeException("配置文件 application.yaml 未找到！")
-            }
-            return Yaml(getConstructor()).load(inputStream)
+        if (!Files.exists(configFilePath)) {
+            throw RuntimeException("配置文件未找到: $configFilePath")
         }
+
+        try {
+            val yamlContent = Files.readString(configFilePath)
+
+            return Yaml(getConstructor()).load(yamlContent)
+                ?: throw RuntimeException("YAML解析返回null")
+
+        } catch (e: Exception) {
+            throw RuntimeException("YAML解析失败: ${e.message}", e)
+        }
+
     }
     private fun getConstructor(): Constructor {
         val propertyUtils = object : PropertyUtils() {
@@ -38,12 +66,20 @@ object YamlConfigLoader {
             setPropertyUtils(propertyUtils)
         }
     }
+
     fun loadDatabaseConfig(): DatabaseConfig = config.database
     fun loadCryptoConfig(): CryptoConfig = config.crypto
     fun loadWebsocketConfig(): WebsocketConfig = config.websocket
+    fun loadHttpConfig(): HttpConfig = config.http
+    fun loadModeConfig(): ModeConfig = config.mode
+    fun loadToolConfig(): ToolConfig = config.tools
     data class ConfigWrapper(
-        var database :DatabaseConfig,
-        var crypto :CryptoConfig,
-        var websocket :WebsocketConfig
+        var database: DatabaseConfig = DatabaseConfig(),
+        var crypto: CryptoConfig = CryptoConfig(),
+        var mode: ModeConfig = ModeConfig(),
+        var websocket: WebsocketConfig = WebsocketConfig(),
+        var http: HttpConfig = HttpConfig(),
+        var tools: ToolConfig = ToolConfig(),
+
     )
 }

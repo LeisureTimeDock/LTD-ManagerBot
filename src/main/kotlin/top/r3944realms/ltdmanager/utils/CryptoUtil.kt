@@ -10,19 +10,24 @@ object CryptoUtil {
     private const val SECRET_KEY = "ltd25r3944realms"
     private const val ALGORITHM = "AES"
 
-    private val secretKey: String
-        get() {
-            return YamlConfigLoader.loadCryptoConfig().secretKey ?: SECRET_KEY
-        }
-
+    private var secretKey: String = ""
+    private fun getSecretKey() :String {
+        if (secretKey.isEmpty())
+            synchronized(CryptoUtil::class.java) {
+                if (secretKey.isEmpty()) {
+                    this.secretKey = YamlConfigLoader.loadCryptoConfig().secretKey.toString()
+                }
+            }
+        return this.secretKey;
+    }
     // 解密
     fun decrypt(encryptedText: String): String {
-        return decrypt(encryptedText, secretKey)
+        return decrypt(encryptedText, getSecretKey())
     }
 
     // 加密
     fun encrypt(plainText: String): String {
-        return encrypt(plainText, secretKey)
+        return encrypt(plainText, getSecretKey())
     }
 
     fun decrypt(encryptedText: String, secretKey: String): String {

@@ -1,0 +1,16 @@
+
+package top.r3944realms.ltdmanager.napcat.request.account
+
+import kotlinx.serialization.Serializable
+import top.r3944realms.ltdmanager.napcat.Developing
+
+/**
+ * GetUnidirectionalFriendList请求
+ */
+@Developing
+@Serializable
+class GetUnidirectionalFriendListRequest: AbstractAccountRequest() {
+    override fun toJSON(): String = "{}"
+
+    override fun path(): String = "/get_unidirectional_friend_list"
+}

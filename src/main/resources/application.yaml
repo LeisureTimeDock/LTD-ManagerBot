@@ -1,4 +1,3 @@
-# 重载后注释将会消失
 database:
   # 数据库地址
   url: "jdbc:mysql://localhost:3306/quizdb?useSSL=false&serverTimezone=UTC"
@@ -9,6 +8,21 @@ database:
 crypto:
   # 示例AES加密密钥 密钥字段必需是16字节的正整数倍
   secret-key: "ltd25r3944realms"
+mode:
+  bot-api-type: HTTP
+  environment: DEVELOPMENT
+http:
+  url: "https://127.0.0.1:3001"
+  # 格式为 ENC(XXX),若不是则会在加载完成配置后自动加密
+  encrypted-token: "123123bb"
 websocket:
-  url:
-  token:
+  url: "wss://127.0.0.1:3002"
+  # 格式为 ENC(XXX),若不是则会在加载完成配置后自动加密
+  encrypted-token: "123123cc"
+tools:
+  rcon:
+    mc-rcon-tool-path: "/path/to/rcon"
+    mc-rcon-tool-config-path: "/path/to/rcon_config"
+    server-url: "your.minecraft.server"
+    # 格式为 ENC(XXX),若不是则会在加载完成配置后自动加密
+    rcon-password: "123123dd"

@@ -6,15 +6,15 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class Author (
     @SerialName("groupId")
-    val groupID: String,
+    val groupId: String,
 
     val groupName: String,
 
     @SerialName("numId")
-    val numID: String,
+    val numId: String,
 
     @SerialName("strId")
-    val strID: String,
+    val strId: String,
 
     val type: Double,
     val uid: String

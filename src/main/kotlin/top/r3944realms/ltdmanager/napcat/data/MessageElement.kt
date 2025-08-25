@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-class MessageElement(
+class MessageElement private constructor (
     val type: MessageType,
     val data: Message? = null
 ) {
@@ -13,7 +13,7 @@ class MessageElement(
         fun at(qq: ID, name: String?): MessageElement = MessageElement(MessageType.At, AtMessage(qq, name))
         fun image(file: String, summary: String?): MessageElement = MessageElement(MessageType.Image, ImageMessage(file, summary))
         fun json(json: String): MessageElement = MessageElement(MessageType.JSON, JSONMessage(json))
-        fun face(id: Int): MessageElement = MessageElement(MessageType.Face, FaceMessage(id))
+        fun face(id: Long): MessageElement = MessageElement(MessageType.Face, FaceMessage(id))
         fun record(file: String): MessageElement = MessageElement(MessageType.Record, RecordMessage(file))
         fun markdown(text: String): MessageElement = MessageElement(MessageType.Record, RecordMessage(text))
         fun video(video: String): MessageElement = MessageElement(MessageType.Video, VideoMessage(video))
@@ -29,7 +29,7 @@ class MessageElement(
 
     }
     @Serializable
-    abstract class Message
+    sealed class Message
 
     /**
      * 文本
@@ -91,7 +91,7 @@ class MessageElement(
      */
     @Serializable
     data class FaceMessage(
-        val id: Int
+        val id: Long
     ) : Message()
 
     /**

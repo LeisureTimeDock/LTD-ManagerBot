@@ -6,14 +6,14 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class CollectionItemList (
     val author: Author,
-    val bid: Double,
-    val category: Double,
+    val bid: Long,
+    val category: Long,
     val cid: String,
     val collectTime: String,
     val createTime: String,
 
     @SerialName("customGroupId")
-    val customGroupID: Double,
+    val customGroupId: Double,
 
     val modifyTime: String,
     val securityBeat: Boolean,

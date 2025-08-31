@@ -1,3 +1,4 @@
+#修改后再重启注释将会消失
 database:
   # 数据库地址
   url: "jdbc:mysql://localhost:3306/quizdb?useSSL=false&serverTimezone=UTC"
@@ -26,3 +27,19 @@ tools:
     server-url: "your.minecraft.server"
     # 格式为 ENC(XXX),若不是则会在加载完成配置后自动加密
     rcon-password: "123123dd"
+mail:
+  protocol: "SMTP"
+  host: "smtp.example.com"
+  port: 587
+  mail-address: "your_email@example.com"
+  # 格式为 ENC(XXX),若不是则会在加载完成配置后自动加密
+  encrypted-password: "your_password"
+  auth: true
+  tls: true
+blessing-skin-server:
+  url: "https://your.blessing.server"
+  invitation-api:
+    path: "/api/invitation-codes/generate"
+    # 格式为 ENC(XXX),若不是则会在加载完成配置后自动加密
+    encrypted-token: "your-secret-token"
+

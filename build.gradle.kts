@@ -39,6 +39,10 @@ repositories {
         implementation("com.mysql:mysql-connector-j:8.0.33") // 使用MySQL 8.x驱动
         implementation("com.zaxxer:HikariCP:5.0.1") // 连接池
 
+        // 邮箱相关
+        implementation("jakarta.mail:jakarta.mail-api:2.0.1") //API
+        implementation("com.sun.mail:jakarta.mail:2.0.1")    // 实现
+
         // 日志系统
         implementation("org.slf4j:slf4j-api:2.0.7")
         implementation("org.apache.logging.log4j:log4j-slf4j2-impl:2.20.0")
@@ -70,7 +74,7 @@ repositories {
 }
 tasks {
     // ShadowJar 配置
-    named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
+    named<ShadowJar>("shadowJar") {
         archiveClassifier.set("") // 去掉 -all 后缀
         mergeServiceFiles()
         manifest {

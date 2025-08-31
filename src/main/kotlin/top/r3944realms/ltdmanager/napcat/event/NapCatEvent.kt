@@ -1,7 +1,10 @@
 package top.r3944realms.ltdmanager.napcat.event
 
 import io.ktor.http.*
-import kotlinx.serialization.*
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
 import top.r3944realms.ltdmanager.napcat.event.account.AbstractAccountEvent
 import top.r3944realms.ltdmanager.napcat.event.file.AbstractFileEvent
@@ -41,8 +44,8 @@ abstract class NapCatEvent(
             }
         }
 
-        private fun failedDecode(jsonString: String): FailedRequestEvent {
-            return FailedRequestEvent.json.decodeFromString(jsonString)
+        private fun failedDecode(jsonString: String): FailedNapCatRequestEvent {
+            return FailedNapCatRequestEvent.json.decodeFromString(jsonString)
         }
         fun decodeEvent(jsonString: String, type: String): NapCatEvent {
             return try {

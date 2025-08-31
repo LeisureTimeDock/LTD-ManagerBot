@@ -33,7 +33,6 @@ class ModuleManager {
         }
         try {
             module.load()
-            LoggerUtil.logger.info("模块加载: $name")
         } catch (e: Exception) {
             LoggerUtil.logger.error("加载模块 $name 失败", e)
         }
@@ -42,7 +41,7 @@ class ModuleManager {
     /**
      * 卸载指定模块
      */
-    fun unloadModule(name: String) {
+    suspend fun unloadModule(name: String) {
         val module = modules[name]
         if (module == null) {
             LoggerUtil.logger.warn("尝试卸载不存在的模块: $name")
@@ -54,7 +53,6 @@ class ModuleManager {
         }
         try {
             module.unload()
-            LoggerUtil.logger.info("模块卸载: $name")
         } catch (e: Exception) {
             LoggerUtil.logger.warn("卸载模块 $name 失败", e)
         }
@@ -63,12 +61,12 @@ class ModuleManager {
     /**
      * 卸载所有模块
      */
-    fun unloadAll() {
+    suspend fun unloadAll() {
         modules.values.forEach { module ->
             try {
                 if (module.loaded) {
                     module.unload()
-                    LoggerUtil.logger.info("模块卸载: ${module.name}")
+
                 }
             } catch (e: Exception) {
                 LoggerUtil.logger.warn("卸载模块 ${module.name} 失败", e)
@@ -97,7 +95,7 @@ class ModuleManager {
     /**
      * 扩展方法：批量卸载模块
      */
-    fun ModuleManager.unloadModules(vararg names: String) {
+    suspend fun ModuleManager.unloadModules(vararg names: String) {
         names.forEach { unloadModule(it) }
     }
     /**

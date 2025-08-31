@@ -4,7 +4,6 @@ package top.r3944realms.ltdmanager.napcat.event.message.group
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import top.r3944realms.ltdmanager.napcat.event.NapCatEvent
 import top.r3944realms.ltdmanager.napcat.event.group.AbstractGroupEvent
 
 /**

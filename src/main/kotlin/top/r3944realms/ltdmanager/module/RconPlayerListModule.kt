@@ -4,13 +4,12 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import top.r3944realms.ltdmanager.core.config.YamlConfigLoader
+import top.r3944realms.ltdmanager.module.RconPlayerListModule.LastTriggerState
 import top.r3944realms.ltdmanager.napcat.NapCatClient
 import top.r3944realms.ltdmanager.napcat.data.ID
 import top.r3944realms.ltdmanager.napcat.data.MessageElement
 import top.r3944realms.ltdmanager.napcat.data.MessageType
-import top.r3944realms.ltdmanager.napcat.event.message.GetGroupMsgHistoryEvent
-import top.r3944realms.ltdmanager.napcat.request.message.GetGroupMsgHistoryRequest
+import top.r3944realms.ltdmanager.napcat.event.message.GetFriendMsgHistoryEvent
 import top.r3944realms.ltdmanager.napcat.request.message.SendForwardMsgRequest
 import top.r3944realms.ltdmanager.napcat.request.other.SendGroupMsgRequest
 import top.r3944realms.ltdmanager.utils.CmdUtil
@@ -19,173 +18,161 @@ import java.io.File
 import java.util.concurrent.TimeoutException
 
 class RconPlayerListModule(
-    private val pollIntervalMillis: Long = 30_000L,
-    private val timeout: Long = 2_000L,
-    private val cooldownMillis: Long = 30_000L, // 默认 30 秒
+    private val groupMessagePollingModule: GroupMessagePollingModule,
+    private val rconTimeOut: Long = 2_000L,
+    private val cooldownMillis: Long = 30_000L,
     private var lastSuccessTime: Long = 0L,
-    private var msgHistoryCheck: Int = 5,
-    private val targetGroupId: Long,
     private val selfId: Long,
     private val selfNickName: String,
+    private val rconPath: String,
+    private val rconConfigPath: String,
     private val keywords: Set<String> = setOf("查看玩家列表", "玩家列表", "在线玩家")
-) : BaseModule() {
+) : BaseModule(), PersistentState<LastTriggerState> {
 
-    private val stopSignal = CompletableDeferred<Unit>() // 用于等待协程退出
     override val name: String = "RconPlayerListModule"
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var scope : CoroutineScope? = null
 
     // 持久化文件路径
     private val stateFile = File("rcon_playerlist_state.json")
 
+    override fun getStateFile(): File = stateFile
+
     // 保存最新触发过的消息 realId 和 time
-    private var moduleState: ModuleState = loadState()
+    private var lastTriggerState: LastTriggerState = loadState()
 
-    private val rconPath: String
-        get() = YamlConfigLoader.loadToolConfig().rcon.mcRconToolPath
-            ?: throw IllegalStateException("RCON 工具路径未配置")
-
-    private val rconConfigPath: String
-        get() = YamlConfigLoader.loadToolConfig().rcon.mcRconToolConfigPath
-            ?: throw IllegalStateException("Rcon配置路径未配置")
+    override fun getState(): LastTriggerState = lastTriggerState
 
     override fun onLoad() {
-        LoggerUtil.logger.info("[$name] 模块已装载，目标群组: $targetGroupId，轮询间隔: ${pollIntervalMillis}ms")
-        LoggerUtil.logger.info("[$name] 上次触发状态: realId=${moduleState.lastTriggeredRealId}, time=${moduleState.lastTriggerTime}")
+        LoggerUtil.logger.info("[$name] 模块已装载，目标群组: ${groupMessagePollingModule.targetGroupId}")
+        LoggerUtil.logger.info("[$name] 上次触发状态: realId=${lastTriggerState.lastTriggeredRealId}, time=${lastTriggerState.lastTriggerTime}")
         LoggerUtil.logger.info("[$name] 关键词列表: $keywords")
-
-        scope.launch {
+        scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        scope!!.launch {
             LoggerUtil.logger.info("[$name] 轮询协程启动")
-            try {
-                while (isActive) {
-                    LoggerUtil.logger.debug("[$name] 开始轮询群消息历史...")
-                    try {
-                        val historyEvent = napCatClient.send(
-                            GetGroupMsgHistoryRequest(
-                                count = msgHistoryCheck,
-                                groupId = ID.long(targetGroupId)
-                            )
-                        ) as? GetGroupMsgHistoryEvent
-
-                        val messages = historyEvent?.data?.messages ?: emptyList()
-                        LoggerUtil.logger.debug("[$name] 获取到 ${messages.size} 条最近消息")
-
-                        // 找到比 lastTriggeredRealId 更新的触发消息
-                        val triggerMessages = messages.filter { msg ->
-                            ((msg.time > moduleState.lastTriggerTime ||
-                                    (msg.time == moduleState.lastTriggerTime && msg.realId > moduleState.lastTriggeredRealId)) && msg.userId != selfId) &&
-                                    msg.message.any { seg ->
-                                        seg.type == MessageType.Text &&
-                                                seg.data.text?.let { text ->
-                                                    keywords.any { keyword ->
-                                                        text == keyword
-                                                    }
-                                                } == true
-                                    }
-                        }
-
-                        LoggerUtil.logger.debug("[$name] 找到 ${triggerMessages.size} 条符合条件的触发消息")
-
-                        if (triggerMessages.isNotEmpty()) {
-                            val triggerMsg = triggerMessages.maxBy { it.time }
-                            LoggerUtil.logger.info("[$name] 找到触发消息 realId=${triggerMsg.realId}, time=${triggerMsg.time}, userId=${triggerMsg.userId}")
-
-                            val now = System.currentTimeMillis()
-
-                            // ✅ 首次触发允许直接执行
-                            val canTrigger = (lastSuccessTime == 0L) || (now - lastSuccessTime >= cooldownMillis)
-
-                            if (!canTrigger) {
-                                val remaining = ((cooldownMillis - (now - lastSuccessTime)) / 1000).coerceAtLeast(1)
-                                LoggerUtil.logger.info("[$name] 冷却中，拒绝执行，剩余 $remaining 秒")
-                                sendCooldownMessage(napCatClient, triggerMsg.realId, triggerMsg.time)
-                                continue
-                            }
-
-                            // 执行 RCON
-                            val commands = listOf("forge tps","list")
-                            LoggerUtil.logger.info("[$name] 执行 RCON 命令: $commands")
-
-
-                            runCatching {
-                                val tpsOutput = runCatching {
-                                    CmdUtil.runExeCommand(rconPath, "-c", rconConfigPath, "-T", (timeout / 1000).toString() + "s", "forge tps")
-                                }.getOrElse { ex ->
-                                    LoggerUtil.logger.warn("[$name] 执行 forge tps 失败: ${ex.message}")
-                                    throw ex
-                                }
-
-                                val listOutput = runCatching {
-                                    CmdUtil.runExeCommand(rconPath, "-c", rconConfigPath, "-T", (timeout / 1000).toString() + "s", "list")
-                                }.getOrElse { ex ->
-                                    LoggerUtil.logger.warn("[$name] 执行 list 失败: ${ex.message}")
-                                    throw ex
-                                }
-                                if (tpsOutput.contains("i/o timeout") || listOutput.contains("i/o timeout")) {
-                                    throw TimeoutException()
-                                }
-                                // 合并输出，再解析
-                                buildString {
-                                    appendLine(tpsOutput.trim())
-                                    appendLine("--------")
-                                    appendLine(listOutput.trim())
-                                }
-                            } .onFailure { ex ->
-                                if (ex is TimeoutException) {
-                                    lastSuccessTime = now // ✅ 成功后记录冷却开始时间
-                                    LoggerUtil.logger.warn("[$name] RCON 连接超时: ${ex.message}")
-                                    sendFailedMessage(napCatClient, triggerMsg.realId, triggerMsg.time)
-                                } else {
-                                    lastSuccessTime = now // ✅ 成功后记录冷却开始时间
-                                    LoggerUtil.logger.error("[$name] RCON 命令执行失败", ex)
-                                    sendFailedMessage(
-                                        napCatClient,
-                                        triggerMsg.realId,
-                                        triggerMsg.time,
-                                        "系统内部错误请联系管理员：${ex.message}"
-                                    )
-                                    throw ex
-                                }
-                            } .onSuccess { output ->
-                                lastSuccessTime = now // ✅ 成功后记录冷却开始时间
-                                LoggerUtil.logger.info("[$name] RCON 命令执行成功，输出长度: ${output.length}")
-                                LoggerUtil.logger.debug("[$name] RCON 输出内容: $output")
-                                val tpsInfo = parseTPS(output)
-                                val playerListInfo = parsePlayerList(output)
-                                LoggerUtil.logger.info("[$name] 解析成功: TPS=${tpsInfo.overall.meanTPS}, 在线 ${playerListInfo.onlineCount} 人")
-                                // 发送转发消息
-                                sendForwardMessage(napCatClient, tpsInfo, playerListInfo, triggerMsg.realId, triggerMsg.time)
-                            }
-                        } else {
-                            LoggerUtil.logger.debug("[$name] 未找到新的触发消息")
-                        }
-                    } catch (e: Exception) {
-                        LoggerUtil.logger.error("[$name] 轮询玩家列表或发送转发消息失败", e)
-                    }
-                    LoggerUtil.logger.debug("[$name] 本轮轮询完成，等待 ${pollIntervalMillis}ms")
-                    delay(pollIntervalMillis)
+            scope!!.launch {
+                LoggerUtil.logger.info("[$name] 开始订阅消息流")
+                groupMessagePollingModule.messagesFlow.collect { messages ->
+                    if(loaded) handleMessages(messages)
                 }
-            } catch (e: CancellationException) {
-                LoggerUtil.logger.info("[$name] 轮询协程收到取消信号")
-            } finally {
-                LoggerUtil.logger.info("[$name] 轮询协程退出，完成 stopSignal")
-                stopSignal.complete(Unit)
             }
         }
     }
 
-    public override fun onUnload() {
-        LoggerUtil.logger.info("[$name] 模块已卸载")
-        saveState(moduleState.lastTriggeredRealId, moduleState.lastTriggerTime) // 卸载时保存
+    override suspend fun onUnload() {
+        LoggerUtil.logger.info("[$name] 模块卸载，取消协程...")
+        scope?.cancel()
+        saveState(lastTriggerState)
+        LoggerUtil.logger.info("[$name] 模块已卸载完成")
     }
 
-    override suspend fun stop() {
-        LoggerUtil.logger.info("[$name] 收到停止命令，开始关闭协程...")
-        scope.cancel()              // 取消协程
-        LoggerUtil.logger.info("[$name] 等待协程退出...")
-        stopSignal.await()          // 等待协程完成
-        LoggerUtil.logger.info("[$name] 协程已退出，卸载模块资源")
-        onUnload()                  // 卸载模块资源，保存状态
+    private suspend fun handleMessages(messages: List<GetFriendMsgHistoryEvent.SpecificMsg>) {
+        val triggerMessages = messages
+            .asSequence() // 使用序列提高性能，特别是消息量大时
+            .filter { msg ->
+            ((msg.time > lastTriggerState.lastTriggerTime ||
+                    (msg.time == lastTriggerState.lastTriggerTime && msg.realId > lastTriggerState.lastTriggeredRealId))
+                    && msg.userId != selfId) &&
+                    msg.message.any { seg ->
+                        seg.type == MessageType.Text &&
+                                seg.data.text?.let { text -> keywords.any { keyword -> text == keyword } } == true
+                    }
+        }.toList()
+
+        if (triggerMessages.isNotEmpty()) {
+            val triggerMsg = triggerMessages.maxBy { it.time }
+            LoggerUtil.logger.info("[$name] 找到触发消息 realId=${triggerMsg.realId}, time=${triggerMsg.time}, userId=${triggerMsg.userId}")
+            processTrigger(triggerMsg)
+        }
     }
+    private suspend fun processTrigger(msg: GetFriendMsgHistoryEvent.SpecificMsg) {
+        val now = System.currentTimeMillis()
+
+        // ✅ 冷却检查（首次触发直接允许）
+        val canTrigger = (lastSuccessTime == 0L) || (now - lastSuccessTime >= cooldownMillis)
+        if (!canTrigger) {
+            val remaining = ((cooldownMillis - (now - lastSuccessTime)) / 1000).coerceAtLeast(1)
+            LoggerUtil.logger.info("[$name] 冷却中，拒绝执行，剩余 $remaining 秒")
+            sendCooldownMessage(napCatClient, msg.realId, msg.time)
+            return
+        }
+
+        // ✅ 执行 RCON 命令
+        val commands = listOf("forge tps", "list")
+        LoggerUtil.logger.info("[$name] 执行 RCON 命令: $commands")
+
+        runCatching {
+            val tpsOutput = runCatching {
+                CmdUtil.runExeCommand(
+                    rconPath,
+                    "-c", rconConfigPath,
+                    "-T", (rconTimeOut / 1000).toString() + "s",
+                    "forge tps"
+                )
+            }.getOrElse { ex ->
+                LoggerUtil.logger.warn("[$name] 执行 forge tps 失败: ${ex.message}")
+                throw ex
+            }
+
+            val listOutput = runCatching {
+                CmdUtil.runExeCommand(
+                    rconPath,
+                    "-c", rconConfigPath,
+                    "-T", (rconTimeOut / 1000).toString() + "s",
+                    "list"
+                )
+            }.getOrElse { ex ->
+                LoggerUtil.logger.warn("[$name] 执行 list 失败: ${ex.message}")
+                throw ex
+            }
+
+            if (tpsOutput.contains("i/o timeout") || listOutput.contains("i/o timeout")) {
+                throw TimeoutException()
+            }
+
+            // 合并输出，后续一起解析
+            buildString {
+                appendLine(tpsOutput.trim())
+                appendLine("--------")
+                appendLine(listOutput.trim())
+            }
+        }.onFailure { ex ->
+            lastSuccessTime = now // ✅ 成功/失败都要刷新冷却开始时间
+
+            if (ex is TimeoutException) {
+                LoggerUtil.logger.warn("[$name] RCON 连接超时: ${ex.message}")
+                sendFailedMessage(napCatClient, msg.realId, msg.time)
+            } else {
+                LoggerUtil.logger.error("[$name] RCON 命令执行失败", ex)
+                sendFailedMessage(
+                    napCatClient,
+                    msg.realId,
+                    msg.time,
+                    "系统内部错误请联系管理员：${ex.message}"
+                )
+                throw ex
+            }
+        }.onSuccess { output ->
+            lastSuccessTime = now
+            LoggerUtil.logger.info("[$name] RCON 命令执行成功，输出长度: ${output.length}")
+            LoggerUtil.logger.debug("[$name] RCON 输出内容: $output")
+
+            val tpsInfo = parseTPS(output)
+            val playerListInfo = parsePlayerList(output)
+
+            LoggerUtil.logger.info(
+                "[$name] 解析成功: TPS=${tpsInfo.overall.meanTPS}, 在线 ${playerListInfo.onlineCount} 人"
+            )
+
+            sendForwardMessage(napCatClient, tpsInfo, playerListInfo, msg.realId, msg.time)
+        }
+
+        // ✅ 更新触发状态 & 持久化
+        lastTriggerState.lastTriggeredRealId = msg.realId
+        lastTriggerState.lastTriggerTime = msg.time
+        saveState(lastTriggerState)
+    }
+
+
     private suspend fun sendCooldownMessage(client: NapCatClient, realId: Long, time: Long) {
         val now = System.currentTimeMillis()
         val remaining = ((cooldownMillis - (now - lastSuccessTime)) / 1000).coerceAtLeast(1) // 至少显示 1 秒
@@ -195,14 +182,14 @@ class RconPlayerListModule(
 
         val request = SendGroupMsgRequest(
             MessageElement.reply(ID.long(realId), msg),
-            ID.long(targetGroupId)
+            ID.long(groupMessagePollingModule.targetGroupId)
         )
         client.sendUnit(request)
 
         // 更新触发状态，但不更新 lastSuccessTime（避免延长冷却）
-        moduleState.lastTriggeredRealId = realId
-        moduleState.lastTriggerTime = time
-        saveState(realId, time)
+        lastTriggerState.lastTriggeredRealId = realId
+        lastTriggerState.lastTriggerTime = time
+        saveState(lastTriggerState)
     }
 
     private val failedMessages = listOf(
@@ -211,7 +198,21 @@ class RconPlayerListModule(
         "🐌 RCON 响应太慢，像蜗牛一样",
         "🛠️ 系统开小差了，请联系管理员",
         "⚠️ 服务器没理我，可能在打盹",
-        "🔥 电路冒烟了！查询失败"
+        "🔥 电路冒烟了！查询失败",
+
+        // 新增的
+        "⏳ 等了半天也没回应，土豆睡着了？",
+        "📡 信号迷路了，RCON 连接失败",
+        "🌀 数据转圈圈，一直出不来",
+        "🚧 前方施工中，暂时无法获取数据",
+        "🤖 RCON 小机器人宕机，请稍后重启",
+        "🌩️ 网络打雷了，数据全跑丢了",
+        "🕳️ 请求掉进黑洞了，没有回音",
+        "🎭 服务器玩消失，不肯理我",
+        "📉 查询失败，RCON 掉线了",
+        "🥶 服务器结冰了，冻得说不出话",
+        "📵 RCON 拒绝通信，像开飞行模式",
+        "💤 服务器打瞌睡，回应超时"
     )
     private suspend fun sendFailedMessage(
         client: NapCatClient,
@@ -226,15 +227,15 @@ class RconPlayerListModule(
 
         val request = SendGroupMsgRequest(
             MessageElement.reply(ID.long(realId), finalText),
-            ID.long(targetGroupId)
+            ID.long(groupMessagePollingModule.targetGroupId)
         )
         client.sendUnit(request)
         LoggerUtil.logger.info("[$name] 已发送 RCON 失败消息")
 
         // 更新触发的最大 realId
-        moduleState.lastTriggeredRealId = realId
-        moduleState.lastTriggerTime = time
-        saveState(realId, time) // 保存到文件
+        lastTriggerState.lastTriggeredRealId = realId
+        lastTriggerState.lastTriggerTime = time
+        saveState(lastTriggerState) // 保存到文件
     }
     private suspend fun sendForwardMessage(client: NapCatClient, tps: TPSInfo, info: PlayerListInfo, realId: Long, time: Long) {
         LoggerUtil.logger.info("[$name] 发送转发消息: realId=$realId, TPS=${tps.overall.meanTPS}, 在线玩家数=${info.onlineCount}")
@@ -279,7 +280,7 @@ class RconPlayerListModule(
         } else {
             messages.add(
                 SendForwardMsgRequest.Message(
-                    data = SendForwardMsgRequest.PurpleData("😴 当前没有玩家在线"),
+                    data = SendForwardMsgRequest.PurpleData("😴 当前没有玩家在线\n"),
                     type = MessageType.Text
                 )
             )
@@ -311,7 +312,7 @@ class RconPlayerListModule(
         )
 
         val request = SendForwardMsgRequest(
-            groupId = ID.long(targetGroupId),
+            groupId = ID.long(groupMessagePollingModule.targetGroupId),
             messages = listOf(topMessage),
             news = listOf(
                 SendForwardMsgRequest.ForwardModelNews("点击查看服务器状态与玩家列表"),
@@ -325,9 +326,9 @@ class RconPlayerListModule(
 
         client.sendUnit(request)
         LoggerUtil.logger.info("[$name] 已发送 TPS+玩家列表 转发消息")
-        moduleState.lastTriggeredRealId = realId
-        moduleState.lastTriggerTime = time
-        saveState(realId, time)
+        lastTriggerState.lastTriggeredRealId = realId
+        lastTriggerState.lastTriggerTime = time
+        saveState(lastTriggerState)
     }
 
     // 添加时间格式化函数
@@ -476,30 +477,29 @@ class RconPlayerListModule(
     // ---------------- 持久化部分 ----------------
 
     @Serializable
-    data class ModuleState(var lastTriggeredRealId: Long, var lastTriggerTime: Long)
+    data class LastTriggerState(var lastTriggeredRealId: Long, var lastTriggerTime: Long)
 
-    private fun saveState(realId: Long, time: Long) {
+    override fun saveState(state: LastTriggerState) {
         try {
-            val state = ModuleState(realId, time)
             stateFile.writeText(Json.encodeToString(state))
-            LoggerUtil.logger.info("[$name] 已保存状态: lastTriggeredRealId=$realId, lastTriggerTime=$time")
+            LoggerUtil.logger.info("[$name] 已保存状态: lastTriggeredRealId=${state.lastTriggeredRealId}, lastTriggerTime=${state.lastTriggerTime}")
         } catch (e: Exception) {
             LoggerUtil.logger.error("[$name] 保存状态失败", e)
         }
     }
 
-    private fun loadState(): ModuleState {
+    override fun loadState(): LastTriggerState {
         return try {
             if (!stateFile.exists()) {
                 LoggerUtil.logger.info("[$name] 状态文件不存在，使用默认值")
-                return ModuleState(-1L, 0L)
+                return LastTriggerState(-1L, 0L)
             }
-            val state = Json.decodeFromString<ModuleState>(stateFile.readText())
+            val state = Json.decodeFromString<LastTriggerState>(stateFile.readText())
             LoggerUtil.logger.info("[$name] 成功加载状态: lastTriggeredRealId=${state.lastTriggeredRealId}, lastTriggerTime=${state.lastTriggerTime}")
             state
         } catch (e: Exception) {
             LoggerUtil.logger.warn("[$name] 读取状态失败，使用默认值", e)
-            ModuleState(-1L, 0L)
+            LastTriggerState(-1L, 0L)
         }
     }
 }

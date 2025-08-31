@@ -43,3 +43,5 @@ bin/
 /logs/
 /config/
 /rcon_playerlist_state.json
+/invitation_codes_quarry_state.json.bak
+/invitation_codes_quarry_state.json

@@ -3,8 +3,6 @@ package top.r3944realms.ltdmanager.napcat.event.group
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import top.r3944realms.ltdmanager.napcat.request.group.GetGroupIgnoredNotifiesRequest
-import top.r3944realms.ltdmanager.napcat.request.group.GetGroupSystemMsgRequest
 
 /**
  * GetGroupIgnoredNotifies事件

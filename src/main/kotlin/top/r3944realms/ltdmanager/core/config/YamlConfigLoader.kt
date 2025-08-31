@@ -21,9 +21,7 @@ object YamlConfigLoader {
 
         // 初始化后加密（确保只执行一次）
         runCatching {
-            _config.database.encryptPassword()
-            _config.websocket.encryptToken()
-            _config.http.encryptToken()
+           ensureConfigEncrypted(_config)
         }.onFailure { e ->
             println("初始化加密失败: ${e.message}")
             e.printStackTrace()
@@ -33,6 +31,9 @@ object YamlConfigLoader {
         config?.database?.encryptPassword()
         config?.websocket?.encryptToken()
         config?.http?.encryptToken()
+        config?.mail?.encryptPassword()
+        config?.tools?.rcon?.encryptPassword()
+        config?.blessingSkinServer?.invitationApi?.encryptToken()
     }
     private fun loadConfig(): ConfigWrapper {
         if (!Files.exists(configFilePath)) {
@@ -73,6 +74,8 @@ object YamlConfigLoader {
     fun loadHttpConfig(): HttpConfig = config.http
     fun loadModeConfig(): ModeConfig = config.mode
     fun loadToolConfig(): ToolConfig = config.tools
+    fun loadMailConfig(): MailConfig = config.mail
+    fun loadBlessingSkinServerConfig(): BlessingSkinServerConfig = config.blessingSkinServer
     data class ConfigWrapper(
         var database: DatabaseConfig = DatabaseConfig(),
         var crypto: CryptoConfig = CryptoConfig(),
@@ -80,6 +83,8 @@ object YamlConfigLoader {
         var websocket: WebsocketConfig = WebsocketConfig(),
         var http: HttpConfig = HttpConfig(),
         var tools: ToolConfig = ToolConfig(),
+        var mail: MailConfig = MailConfig(),
+        var blessingSkinServer: BlessingSkinServerConfig = BlessingSkinServerConfig(),
 
     )
 }

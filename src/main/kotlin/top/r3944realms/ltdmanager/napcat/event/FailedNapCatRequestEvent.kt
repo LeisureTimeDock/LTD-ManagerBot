@@ -5,7 +5,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
 @Serializable
-data class FailedRequestEvent(
+data class FailedNapCatRequestEvent(
     val status: Status = Status.Failed,
     val retcode: Int,
     val data: JsonElement?= null,

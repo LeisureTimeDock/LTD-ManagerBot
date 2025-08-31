@@ -18,66 +18,53 @@ class GroupRequestHandlerModule(
 
     override val name: String = "GroupRequestHandlerModule"
 
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var scope: CoroutineScope? = null
 
-    private val stopSignal = CompletableDeferred<Unit>()
 
     override fun onLoad() {
         LoggerUtil.logger.info("模块[$name]已装载，目标群组: $targetGroupId，轮询间隔: ${pollIntervalMillis}ms")
 
+        scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         // 启动轮询协程
-        scope.launch {
+        scope!!.launch {
             LoggerUtil.logger.info("[$name] 轮询协程启动")
-            try {
-                while (isActive) {
-                    try {
-                        LoggerUtil.logger.debug("[$name] 开始轮询群组请求...")
+            while (isActive && loaded) {
+                try {
+                    LoggerUtil.logger.debug("[$name] 开始轮询群组请求...")
 
-                        // 获取正常请求
-                        LoggerUtil.logger.debug("[$name] 获取正常群系统消息...")
-                        val systemEvent: GetGroupSystemMsgEvent =
-                            client.send(GetGroupSystemMsgRequest())
-                        LoggerUtil.logger.debug("[$name] 获取到 ${systemEvent.data.invitedRequest.size} 个邀请请求和 ${systemEvent.data.joinRequests.size} 个加群请求")
+                    // 获取正常请求
+                    LoggerUtil.logger.debug("[$name] 获取正常群系统消息...")
+                    val systemEvent: GetGroupSystemMsgEvent =
+                        client.send(GetGroupSystemMsgRequest())
+                    LoggerUtil.logger.debug("[$name] 获取到 ${systemEvent.data.invitedRequest.size} 个邀请请求和 ${systemEvent.data.joinRequests.size} 个加群请求")
 
-                        handleEvent(systemEvent)
+                    handleEvent(systemEvent)
 
-                        // 获取被过滤的请求
-                        LoggerUtil.logger.debug("[$name] 获取被过滤的群系统消息...")
-                        val ignoredEvent: GetGroupIgnoredNotifiesEvent =
-                            client.send(GetGroupIgnoredNotifiesRequest())
-                        LoggerUtil.logger.debug("[$name] 获取到 ${ignoredEvent.data.invitedRequest.size} 个被过滤的邀请请求和 ${ignoredEvent.data.joinRequests.size} 个被过滤的加群请求")
+                    // 获取被过滤的请求
+                    LoggerUtil.logger.debug("[$name] 获取被过滤的群系统消息...")
+                    val ignoredEvent: GetGroupIgnoredNotifiesEvent =
+                        client.send(GetGroupIgnoredNotifiesRequest())
+                    LoggerUtil.logger.debug("[$name] 获取到 ${ignoredEvent.data.invitedRequest.size} 个被过滤的邀请请求和 ${ignoredEvent.data.joinRequests.size} 个被过滤的加群请求")
 
-                        handleEvent(ignoredEvent)
+                    handleEvent(ignoredEvent)
 
-                        LoggerUtil.logger.debug("[$name] 本轮轮询完成，等待 ${pollIntervalMillis}ms 后继续")
-                    } catch (e: Exception) {
-                        LoggerUtil.logger.error("[$name] 轮询执行异常", e)
-                    }
-                    delay(pollIntervalMillis)
+                    LoggerUtil.logger.debug("[$name] 本轮轮询完成，等待 ${pollIntervalMillis}ms 后继续")
+                } catch (e: Exception) {
+                    LoggerUtil.logger.error("[$name] 轮询执行异常", e)
                 }
-            } catch (e: CancellationException) {
-                LoggerUtil.logger.info("[$name] 轮询协程收到取消信号")
-            } finally {
-                LoggerUtil.logger.info("[$name] 轮询协程退出，完成 stopSignal")
-                stopSignal.complete(Unit)
+                delay(pollIntervalMillis)
             }
         }
     }
 
-    override suspend fun stop() {
-        LoggerUtil.logger.info("[$name] 收到停止命令，开始关闭协程...")
-        scope.cancel()
-        LoggerUtil.logger.info("[$name] 等待协程退出...")
-        stopSignal.await()
-        LoggerUtil.logger.info("[$name] 协程已退出，卸载模块资源")
-        onUnload()
-    }
 
-    public override fun onUnload() {
+    public override suspend fun onUnload() {
         LoggerUtil.logger.info("[$name] 已卸载")
+        scope?.cancel()
     }
 
     private suspend fun handleEvent(event: Any) {
+        if (!loaded) return
         LoggerUtil.logger.debug("[$name] 处理群请求事件: ${event.javaClass.simpleName}")
 
         val provider: GroupRequestProvider? = when (event) {
@@ -115,7 +102,7 @@ class GroupRequestHandlerModule(
                         }
 
                         2, 3 -> {
-                            val reason = if (status == 2) "审核未通过" else "待审核"
+                            val reason = if (status == 3) "审核未通过，或请使用填写白名单所用QQ号加群" else "白名单待审核，请通过后再加"
                             LoggerUtil.logger.info("[$name] 拒绝加群: groupId=${request.groupId}, invitorUin=${request.invitorUin}, status=$status, reason=$reason, requestId=${request.requestId}")
                             val request1 = SetGroupAddRequestRequest(
                                 false,

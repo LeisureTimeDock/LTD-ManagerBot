@@ -6,6 +6,9 @@ import top.r3944realms.ltdmanager.utils.YamlUpdater
 data class ToolConfig(
     var rcon: RconConfig = RconConfig()
 ) {
+    fun encryptPassword() {
+        rcon.encryptPassword()
+    }
     data class RconConfig(
         var mcRconToolPath: String? = null,
         var mcRconToolConfigPath: String? = null,
@@ -30,12 +33,12 @@ data class ToolConfig(
         /**
          * 加密 rcon 密码（如果未加密）
          */
-        fun encryptPassword(configFilePath: String) {
+        fun encryptPassword() {
             if (rconPassword == null || isEncrypted()) return
             try {
                 rconPassword = "ENC(${CryptoUtil.encrypt(rconPassword!!)})"
                 YamlUpdater.updateYaml(
-                    configFilePath,
+                    YamlConfigLoader.configFilePath.toString(),
                     "tools.rcon.rcon-password",
                     rconPassword!!
                 )

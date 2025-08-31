@@ -28,37 +28,10 @@ object ConfigInitializer {
             if (resourceStream != null) {
                 Files.copy(resourceStream, filePath, StandardCopyOption.REPLACE_EXISTING)
                 LoggerUtil.logger.info("已生成默认配置文件: $filePath")
-            } else {
-                // 资源文件不存在，可写入内置默认 YAML
-                val defaultYaml = """
-                database:
-                  url: "jdbc:mysql://localhost:3306/quizdb?useSSL=false&serverTimezone=UTC"
-                  user: "root"
-                  encrypted-password: "123123aa"
-                crypto:
-                  secret-key: "ltd25r3944realms"
-                mode:
-                  bot-api-type: HTTP
-                  environment: DEVELOPMENT
-                http:
-                  url: "https://127.0.0.1:3001"
-                  encrypted-token: "123123bb"
-                websocket:
-                  url: "wss://127.0.0.1:3002"
-                  encrypted-token: "123123cc"
-                tools:
-                  rcon:
-                    mc-rcon-tool-path: "/path/to/rcon"
-                    mc-rcon-tool-config-path: "/path/to/rcon_config"
-                    server-url: "your.minecraft.server"
-                    rcon-password: "123123dd"
-                """.trimIndent()
+                LoggerUtil.logger.info("第一次启动，请修改配置后再启动")
+                exitProcess(-1);
+            } else throw Error("Jar内部资源文件缺失")
 
-                Files.writeString(filePath, defaultYaml)
-                LoggerUtil.logger.info("已生成默认配置文件(使用内置内容): $filePath")
-            }
-            LoggerUtil.logger.info("第一次启动，请修改配置后再启动")
-            exitProcess(-1);
         } else {
             LoggerUtil.logger.info("配置文件已存在: $filePath")
         }

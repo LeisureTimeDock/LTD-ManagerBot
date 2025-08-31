@@ -18,7 +18,6 @@ import top.r3944realms.ltdmanager.utils.Environment
 import top.r3944realms.ltdmanager.utils.LoggerUtil
 import java.util.*
 import kotlin.collections.ArrayDeque
-import kotlin.collections.isNotEmpty
 import kotlin.time.Duration.Companion.seconds
 
 class NapCatClient private constructor() : Closeable {
@@ -30,11 +29,11 @@ class NapCatClient private constructor() : Closeable {
     private val semaphore = Semaphore(3)
 
     // 普通优先级队列
-    private val requestQueue = PriorityQueue<QueueItem>(compareBy { it.priority })
+    private val requestQueue = PriorityQueue<NapCatQueueItem>(compareBy { it.priority })
     private val queueMutex = Mutex()
 
     // 紧急队列 (先进先出，最多 10 个)
-    private val urgentQueue = ArrayDeque<QueueItem>(10)
+    private val urgentQueue = ArrayDeque<NapCatQueueItem>(10)
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -71,7 +70,7 @@ class NapCatClient private constructor() : Closeable {
         checkRequest(request)
         val deferred = CompletableDeferred<Unit>()
         queueMutex.withLock {
-            requestQueue.add(QueueItem(request, deferred, retries, priority, expectsEvent = false))
+            requestQueue.add(NapCatQueueItem(request, deferred, retries, priority, expectsEvent = false))
         }
         deferred.await()
     }
@@ -90,7 +89,7 @@ class NapCatClient private constructor() : Closeable {
             if (urgentQueue.size >= 10) {
                 throw IllegalStateException("紧急任务队列已满 (最多 10 个)")
             }
-            urgentQueue.addLast(QueueItem(request, deferred, retries, priority = Int.MIN_VALUE, expectsEvent = false))
+            urgentQueue.addLast(NapCatQueueItem(request, deferred, retries, priority = Int.MIN_VALUE, expectsEvent = false))
         }
         deferred.await()
     }
@@ -106,7 +105,7 @@ class NapCatClient private constructor() : Closeable {
         checkRequest(request)
         val deferred = CompletableDeferred<T>()
         queueMutex.withLock {
-            requestQueue.add(QueueItem(request, deferred, retries, priority, expectsEvent = true))
+            requestQueue.add(NapCatQueueItem(request, deferred, retries, priority, expectsEvent = true))
         }
         return deferred.await()
     }
@@ -125,7 +124,7 @@ class NapCatClient private constructor() : Closeable {
             if (urgentQueue.size >= 10) {
                 throw IllegalStateException("紧急任务队列已满 (最多 10 个)")
             }
-            urgentQueue.addLast(QueueItem(request, deferred, retries, priority = Int.MIN_VALUE, expectsEvent = true))
+            urgentQueue.addLast(NapCatQueueItem(request, deferred, retries, priority = Int.MIN_VALUE, expectsEvent = true))
         }
         return deferred.await()
     }
@@ -139,7 +138,7 @@ class NapCatClient private constructor() : Closeable {
 
     }
 
-    private suspend fun processRequest(item: QueueItem) {
+    private suspend fun processRequest(item: NapCatQueueItem) {
         semaphore.withPermit {
             val (request, deferred, retries, _, expectsEvent) = item
             var attempt = 0

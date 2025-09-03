@@ -82,6 +82,10 @@ abstract class BaseModule {
      */
     protected val blessingSkinClient get() = GlobalManager.blessingSkinClient
     /**
+     * 提供访问全局 mcSrvStatusClient 的快捷方式
+     */
+    protected val mcSrvStatusClient get() = GlobalManager.mcSrvStatusClient
+    /**
      * 获取数据库连接
      * 使用 try-with-resources 时会自动关闭
      */

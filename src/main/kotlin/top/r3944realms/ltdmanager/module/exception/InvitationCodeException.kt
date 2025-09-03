@@ -1,4 +1,4 @@
-package top.r3944realms.ltdmanager.module
+package top.r3944realms.ltdmanager.module.exception
 
 /**
  * 自定义异常类

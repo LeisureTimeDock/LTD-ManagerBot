@@ -3,6 +3,7 @@ package top.r3944realms.ltdmanager
 import kotlinx.coroutines.*
 import top.r3944realms.ltdmanager.blessingskin.BlessingSkinClient
 import top.r3944realms.ltdmanager.core.mysql.MysqlHikariConnectPool
+import top.r3944realms.ltdmanager.mcserver.McSrvStatusClient
 import top.r3944realms.ltdmanager.module.ModuleManager
 import top.r3944realms.ltdmanager.napcat.NapCatClient
 import top.r3944realms.ltdmanager.utils.LoggerUtil
@@ -21,6 +22,9 @@ object GlobalManager {
     // NapCat 客户端
     val napCatClient: NapCatClient by lazy {
         NapCatClient.create()
+    }
+    val mcSrvStatusClient : McSrvStatusClient by lazy {
+        McSrvStatusClient.create()
     }
     val blessingSkinClient: BlessingSkinClient by lazy {
         BlessingSkinClient.create()
@@ -61,6 +65,7 @@ object GlobalManager {
     private fun shutdownResources() {
         val resources = listOf(
             "NapCatClient" to { napCatClient.close() },
+            "McSrvStatusClient" to { mcSrvStatusClient.close() },
             "BlessingSkinClient" to { blessingSkinClient.close() },
             "Hikari 数据源" to { dataSource.close() }
         )

@@ -1,12 +1,14 @@
 package top.r3944realms.ltdmanager
 
 import top.r3944realms.ltdmanager.core.config.YamlConfigLoader
+import top.r3944realms.ltdmanager.module.McServerStatusModule
 import top.r3944realms.ltdmanager.module.*
 
 
 fun main() = GlobalManager.runBlockingMain {
     val groupId:Long = 538751386
     val selfQQId = 3327379836
+    val selfNickName = "闲趣老土豆"
     // 创建模块实例
     val groupModule = GroupRequestHandlerModule(
         client = GlobalManager.napCatClient,
@@ -23,7 +25,7 @@ fun main() = GlobalManager.runBlockingMain {
         rconTimeOut = 2_000L,
         cooldownMillis = 10_000L,
         selfId = selfQQId,
-        selfNickName = "闲趣老土豆",
+        selfNickName = selfNickName,
         rconPath = toolConfig.rcon.mcRconToolPath.toString(),
         rconConfigPath = toolConfig.rcon.mcRconToolConfigPath.toString(),
         keywords = setOf(
@@ -54,10 +56,22 @@ fun main() = GlobalManager.runBlockingMain {
             "Apply for an invitation code"
         )
     )
+    val mcServerStatusModule = McServerStatusModule(
+        groupMessagePollingModule = groupMsgPollingModule,
+        selfId = selfQQId,
+        cooldownSeconds = 20,
+        selfNickName = selfNickName,
+        commands = listOf("/m", "/mcs", "seek", "s"),
+        presetServer = mapOf(
+            setOf("先行土豆", "先行", "pre", "Pre", "BF", "bf", "p", "P") to "n2.akiracloud.net:10599",
+            setOf("土豆", "老土豆", "七周目", "7" ,"ZZ", "zz", "Zz", "seven") to "main.mmccdd.top:11106",
+        )
+    )
 
     // 注册模块到全局模块管理器
     GlobalManager.moduleManager.registerModule(groupModule)
     GlobalManager.moduleManager.registerModule(groupMsgPollingModule)
+    GlobalManager.moduleManager.registerModule(mcServerStatusModule)
     GlobalManager.moduleManager.registerModule(rconModule)
     GlobalManager.moduleManager.registerModule(mailModule)
     GlobalManager.moduleManager.registerModule(invitationCodesModule)
@@ -65,6 +79,7 @@ fun main() = GlobalManager.runBlockingMain {
     // 加载模块
     GlobalManager.moduleManager.loadModule(groupModule.name)
     GlobalManager.moduleManager.loadModule(groupMsgPollingModule.name)
+    GlobalManager.moduleManager.loadModule(mcServerStatusModule.name)
     GlobalManager.moduleManager.loadModule(rconModule.name)
     GlobalManager.moduleManager.loadModule(mailModule.name)
     GlobalManager.moduleManager.loadModule(invitationCodesModule.name)

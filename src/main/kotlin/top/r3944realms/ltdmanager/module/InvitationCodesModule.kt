@@ -8,6 +8,7 @@ import top.r3944realms.ltdmanager.blessingskin.request.invitecode.GenerateInvita
 import top.r3944realms.ltdmanager.blessingskin.response.ResponseResult
 import top.r3944realms.ltdmanager.blessingskin.response.invitecode.InvitationCodeGenerationResponse
 import top.r3944realms.ltdmanager.core.mail.mail
+import top.r3944realms.ltdmanager.module.exception.InvitationCodeException
 import top.r3944realms.ltdmanager.napcat.NapCatClient
 import top.r3944realms.ltdmanager.napcat.data.ID
 import top.r3944realms.ltdmanager.napcat.data.MessageElement
@@ -74,8 +75,8 @@ class InvitationCodesModule(
     private var scope: CoroutineScope? = null
 
     // 持久化文件（带锁 + 备份）
-    private val stateFile = File("invitation_codes_quarry_state.json")
-    private val stateBackupFile = File("invitation_codes_quarry_state.json.bak")
+    private val stateFile = getStateFile("mc_server_status_state.json")
+    private val stateBackupFile = getStateFile("invitation_codes_quarry_state.json.bak")
     private val fileLock = ReentrantLock()
 
     private var lastTriggerMapState = loadState()
@@ -115,6 +116,7 @@ class InvitationCodesModule(
     // 消息处理主流程
     // =========================
     private suspend fun handleMessages(messages: List<GetFriendMsgHistoryEvent.SpecificMsg>) {
+        if (messages.isEmpty()) return
         val triggerMsgs = filterTriggerMessages(messages)
         if (triggerMsgs.isEmpty()) return
 
@@ -373,7 +375,7 @@ class InvitationCodesModule(
         // 冷却中，如果本消息未发送过冷却提示
         if (msg.realId != lastCooldownRealId) {
             val remaining = ((cooldownMillis / 1000) - (nowSec - lastTriggerTime)).coerceAtLeast(1)
-            val msgText = "⏳ 申请邀请码过于频繁，请稍后再试（剩余 $remaining 秒）"
+            val msgText = "⏳ 申请邀请码过于频繁（剩余 $remaining 秒后将为你自动申请）"
             sendCooldownMessage(napCatClient, msg.userId, msg.realId, msgText)
 
             // 记录这条消息已发送过冷却提示

@@ -33,7 +33,9 @@ class RconPlayerListModule(
     private var scope : CoroutineScope? = null
 
     // 持久化文件路径
-    private val stateFile = File("rcon_playerlist_state.json")
+    private val stateFile = getStateFile("rcon_playerlist_state.json")
+
+    private val stateBackupFile = getStateFile("invitation_codes_quarry_state.json.bak")
 
     override fun getStateFile(): File = stateFile
 
@@ -481,6 +483,12 @@ class RconPlayerListModule(
 
     override fun saveState(state: LastTriggerState) {
         try {
+            // 先备份现有主文件
+            if (stateFile.exists()) {
+                stateFile.copyTo(File(stateFile.parent, stateFile.name + ".bak"), overwrite = true)
+            }
+
+            // 写入主文件
             stateFile.writeText(Json.encodeToString(state))
             LoggerUtil.logger.info("[$name] 已保存状态: lastTriggeredRealId=${state.lastTriggeredRealId}, lastTriggerTime=${state.lastTriggerTime}")
         } catch (e: Exception) {
@@ -490,11 +498,18 @@ class RconPlayerListModule(
 
     override fun loadState(): LastTriggerState {
         return try {
-            if (!stateFile.exists()) {
+            val fileToRead = when {
+                stateFile.exists() -> stateFile
+                File(stateFile.parent, stateFile.name + ".bak").exists() -> File(stateFile.parent, stateFile.name + ".bak")
+                else -> null
+            }
+
+            if (fileToRead == null) {
                 LoggerUtil.logger.info("[$name] 状态文件不存在，使用默认值")
                 return LastTriggerState(-1L, 0L)
             }
-            val state = Json.decodeFromString<LastTriggerState>(stateFile.readText())
+
+            val state = Json.decodeFromString<LastTriggerState>(fileToRead.readText())
             LoggerUtil.logger.info("[$name] 成功加载状态: lastTriggeredRealId=${state.lastTriggeredRealId}, lastTriggerTime=${state.lastTriggerTime}")
             state
         } catch (e: Exception) {
@@ -502,4 +517,5 @@ class RconPlayerListModule(
             LastTriggerState(-1L, 0L)
         }
     }
+
 }

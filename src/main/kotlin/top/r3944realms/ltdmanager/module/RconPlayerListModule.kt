@@ -5,6 +5,14 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import top.r3944realms.ltdmanager.module.RconPlayerListModule.LastTriggerState
+import top.r3944realms.ltdmanager.module.common.cooldown.CooldownManager
+import top.r3944realms.ltdmanager.module.common.cooldown.CooldownScope
+import top.r3944realms.ltdmanager.module.common.cooldown.CooldownStateProvider
+import top.r3944realms.ltdmanager.module.common.filter.TriggerMessageFilter
+import top.r3944realms.ltdmanager.module.common.filter.type.CooldownFilter
+import top.r3944realms.ltdmanager.module.common.filter.type.IgnoreSelfFilter
+import top.r3944realms.ltdmanager.module.common.filter.type.KeywordFilter
+import top.r3944realms.ltdmanager.module.common.filter.type.NewMessageFilter
 import top.r3944realms.ltdmanager.napcat.NapCatClient
 import top.r3944realms.ltdmanager.napcat.data.ID
 import top.r3944realms.ltdmanager.napcat.data.MessageElement
@@ -18,26 +26,61 @@ import java.io.File
 import java.util.concurrent.TimeoutException
 
 class RconPlayerListModule(
+    moduleName: String,
     private val groupMessagePollingModule: GroupMessagePollingModule,
     private val rconTimeOut: Long = 2_000L,
     private val cooldownMillis: Long = 30_000L,
-    private var lastSuccessTime: Long = 0L,
     private val selfId: Long,
     private val selfNickName: String,
     private val rconPath: String,
     private val rconConfigPath: String,
     private val keywords: Set<String> = setOf("查看玩家列表", "玩家列表", "在线玩家")
-) : BaseModule(), PersistentState<LastTriggerState> {
-
-    override val name: String = "RconPlayerListModule"
+) : BaseModule("RconPlayerListModule", moduleName), PersistentState<LastTriggerState> {
+    private val cooldownManager by lazy {
+        CooldownManager(
+            cooldownMillis = cooldownMillis,
+            scope = CooldownScope.Global,
+            stateProvider = object : CooldownStateProvider<LastTriggerState> {
+                override fun load() = loadState()
+                override fun save(state: LastTriggerState) = saveState(state)
+            },
+            getLastTrigger = { state, _ -> state.lastTriggerTime to state.lastTriggeredRealId },
+            updateTrigger = { state, _, realId, time ->
+                // ✅ 消息成功触发时更新状态
+                state.updateTrigger(realId, time)
+                state
+            },
+            updateCooldownRealId = { state, _, realId ->
+                // ✅ 消息被冷却拒绝时更新 lastCooldownRealId
+                state.updateCooldownRealId(realId)
+                state
+            },
+            groupId = groupMessagePollingModule.targetGroupId
+        )
+    }
+    /** 抽象过滤器组合 —— lazy 避免初始化顺序问题 */
+    private val triggerFilter by lazy {
+        TriggerMessageFilter(
+            listOf(
+                IgnoreSelfFilter(selfId),
+                NewMessageFilter { _ ->
+                    lastTriggerState.lastTriggerTime to lastTriggerState.lastTriggeredRealId
+                },
+                KeywordFilter(keywords),
+                CooldownFilter(cooldownManager) { msg, remain ->
+                    sendCooldownMessage(napCatClient, msg.realId, remain)
+                }
+            )
+        )
+    }
     private var scope : CoroutineScope? = null
 
     // 持久化文件路径
-    private val stateFile = getStateFile("rcon_playerlist_state.json")
+    private val stateFile: File = getStateFileInternal("rcon_playerlist_state.json", name)
 
-    private val stateBackupFile = getStateFile("invitation_codes_quarry_state.json.bak")
+    private val stateBackupFile: File = getStateFileInternal("rcon_playerlist_state.json.bak", name)
 
-    override fun getStateFile(): File = stateFile
+    override fun getStateFileInternal(): File = stateFile
 
     // 保存最新触发过的消息 realId 和 time
     private var lastTriggerState: LastTriggerState = loadState()
@@ -68,102 +111,53 @@ class RconPlayerListModule(
     }
 
     private suspend fun handleMessages(messages: List<GetFriendMsgHistoryEvent.SpecificMsg>) {
-        val triggerMessages = messages
-            .asSequence() // 使用序列提高性能，特别是消息量大时
-            .filter { msg ->
-            ((msg.time > lastTriggerState.lastTriggerTime ||
-                    (msg.time == lastTriggerState.lastTriggerTime && msg.realId > lastTriggerState.lastTriggeredRealId))
-                    && msg.userId != selfId) &&
-                    msg.message.any { seg ->
-                        seg.type == MessageType.Text &&
-                                seg.data.text?.let { text -> keywords.any { keyword -> text == keyword } } == true
-                    }
-        }.toList()
+        val filtered = triggerFilter.filter(messages)
 
-        if (triggerMessages.isNotEmpty()) {
-            val triggerMsg = triggerMessages.maxBy { it.time }
-            LoggerUtil.logger.info("[$name] 找到触发消息 realId=${triggerMsg.realId}, time=${triggerMsg.time}, userId=${triggerMsg.userId}")
-            processTrigger(triggerMsg)
+        // RCON 模块只取最新的一条消息
+        val triggerMsg = filtered.maxByOrNull { it.time }
+        if (triggerMsg != null) {
+            try {
+                processTrigger(triggerMsg)
+            } catch (e: Exception) {
+                LoggerUtil.logger.error("[$name] 处理触发消息失败", e)
+                sendFailedMessage(napCatClient, triggerMsg.realId, triggerMsg.time, "处理异常: ${e.message}")
+            }
         }
     }
     private suspend fun processTrigger(msg: GetFriendMsgHistoryEvent.SpecificMsg) {
-        val now = System.currentTimeMillis()
+        LoggerUtil.logger.info("[$name] 执行 RCON 查询")
 
-        // ✅ 冷却检查（首次触发直接允许）
-        val canTrigger = (lastSuccessTime == 0L) || (now - lastSuccessTime >= cooldownMillis)
-        if (!canTrigger) {
-            val remaining = ((cooldownMillis - (now - lastSuccessTime)) / 1000).coerceAtLeast(1)
-            LoggerUtil.logger.info("[$name] 冷却中，拒绝执行，剩余 $remaining 秒")
-            sendCooldownMessage(napCatClient, msg.realId, msg.time)
-            return
-        }
-
-        // ✅ 执行 RCON 命令
         val commands = listOf("forge tps", "list")
         LoggerUtil.logger.info("[$name] 执行 RCON 命令: $commands")
 
         runCatching {
-            val tpsOutput = runCatching {
-                CmdUtil.runExeCommand(
-                    rconPath,
-                    "-c", rconConfigPath,
-                    "-T", (rconTimeOut / 1000).toString() + "s",
-                    "forge tps"
-                )
-            }.getOrElse { ex ->
-                LoggerUtil.logger.warn("[$name] 执行 forge tps 失败: ${ex.message}")
-                throw ex
-            }
-
-            val listOutput = runCatching {
-                CmdUtil.runExeCommand(
-                    rconPath,
-                    "-c", rconConfigPath,
-                    "-T", (rconTimeOut / 1000).toString() + "s",
-                    "list"
-                )
-            }.getOrElse { ex ->
-                LoggerUtil.logger.warn("[$name] 执行 list 失败: ${ex.message}")
-                throw ex
-            }
+            val tpsOutput = CmdUtil.runExeCommand(
+                rconPath, "-c", rconConfigPath,
+                "-T", (rconTimeOut / 1000).toString() + "s", "forge tps"
+            )
+            val listOutput = CmdUtil.runExeCommand(
+                rconPath, "-c", rconConfigPath,
+                "-T", (rconTimeOut / 1000).toString() + "s", "list"
+            )
 
             if (tpsOutput.contains("i/o timeout") || listOutput.contains("i/o timeout")) {
                 throw TimeoutException()
             }
 
-            // 合并输出，后续一起解析
             buildString {
                 appendLine(tpsOutput.trim())
                 appendLine("--------")
                 appendLine(listOutput.trim())
             }
         }.onFailure { ex ->
-            lastSuccessTime = now // ✅ 成功/失败都要刷新冷却开始时间
-
+            LoggerUtil.logger.error("[$name] RCON 查询失败", ex)
             if (ex is TimeoutException) {
-                LoggerUtil.logger.warn("[$name] RCON 连接超时: ${ex.message}")
-                sendFailedMessage(napCatClient, msg.realId, msg.time)
-            } else {
-                LoggerUtil.logger.error("[$name] RCON 命令执行失败", ex)
-                sendFailedMessage(
-                    napCatClient,
-                    msg.realId,
-                    msg.time,
-                    "系统内部错误请联系管理员：${ex.message}"
-                )
-                throw ex
+                sendFailedMessage(napCatClient, msg.realId, msg.time, "⏳ RCON 连接超时")
             }
+            throw ex
         }.onSuccess { output ->
-            lastSuccessTime = now
-            LoggerUtil.logger.info("[$name] RCON 命令执行成功，输出长度: ${output.length}")
-            LoggerUtil.logger.debug("[$name] RCON 输出内容: $output")
-
             val tpsInfo = parseTPS(output)
             val playerListInfo = parsePlayerList(output)
-
-            LoggerUtil.logger.info(
-                "[$name] 解析成功: TPS=${tpsInfo.overall.meanTPS}, 在线 ${playerListInfo.onlineCount} 人"
-            )
 
             sendForwardMessage(napCatClient, tpsInfo, playerListInfo, msg.realId, msg.time)
         }
@@ -175,11 +169,8 @@ class RconPlayerListModule(
     }
 
 
-    private suspend fun sendCooldownMessage(client: NapCatClient, realId: Long, time: Long) {
-        val now = System.currentTimeMillis()
-        val remaining = ((cooldownMillis - (now - lastSuccessTime)) / 1000).coerceAtLeast(1) // 至少显示 1 秒
+    private suspend fun sendCooldownMessage(client: NapCatClient, realId: Long, remaining: Long) {
         val msg = "⏳ 查询过于频繁，请稍后再试（剩余 $remaining 秒）"
-
         LoggerUtil.logger.info("[$name] 发送冷却提示: $msg")
 
         val request = SendGroupMsgRequest(
@@ -187,11 +178,6 @@ class RconPlayerListModule(
             ID.long(groupMessagePollingModule.targetGroupId)
         )
         client.sendUnit(request)
-
-        // 更新触发状态，但不更新 lastSuccessTime（避免延长冷却）
-        lastTriggerState.lastTriggeredRealId = realId
-        lastTriggerState.lastTriggerTime = time
-        saveState(lastTriggerState)
     }
 
     private val failedMessages = listOf(
@@ -479,13 +465,30 @@ class RconPlayerListModule(
     // ---------------- 持久化部分 ----------------
 
     @Serializable
-    data class LastTriggerState(var lastTriggeredRealId: Long, var lastTriggerTime: Long)
+    data class LastTriggerState(
+        var lastTriggeredRealId: Long = -1,     // 上次允许处理消息ID
+        var lastTriggerTime: Long = 0,          // 上次允许处理时间（毫秒或秒都可以，根据你的逻辑）
+        var lastCooldownRealId: Long = -1       // 上次冷却期间被拒绝的消息ID
+    ) {
+        /** ✅ 冷却结束，更新触发状态 */
+        fun updateTrigger(realId: Long, time: Long) {
+            lastTriggeredRealId = realId
+            lastTriggerTime = time
+            // 保留 lastCooldownRealId 不变
+        }
+
+        /** ⚠️ 冷却中，更新冷却消息ID */
+        fun updateCooldownRealId(realId: Long) {
+            lastCooldownRealId = realId
+            // 保留 lastTriggeredRealId 和 lastTriggerTime
+        }
+    }
 
     override fun saveState(state: LastTriggerState) {
         try {
             // 先备份现有主文件
             if (stateFile.exists()) {
-                stateFile.copyTo(File(stateFile.parent, stateFile.name + ".bak"), overwrite = true)
+                stateFile.copyTo(stateBackupFile, overwrite = true)
             }
 
             // 写入主文件
@@ -500,7 +503,7 @@ class RconPlayerListModule(
         return try {
             val fileToRead = when {
                 stateFile.exists() -> stateFile
-                File(stateFile.parent, stateFile.name + ".bak").exists() -> File(stateFile.parent, stateFile.name + ".bak")
+                stateBackupFile.exists() -> stateBackupFile
                 else -> null
             }
 
@@ -516,6 +519,37 @@ class RconPlayerListModule(
             LoggerUtil.logger.warn("[$name] 读取状态失败，使用默认值", e)
             LastTriggerState(-1L, 0L)
         }
+    }
+    // 返回模块基本信息
+    override fun info(): String = buildString {
+        appendLine("模块名称: $name")
+        appendLine("模块类型: RconPlayerListModule")
+        appendLine("目标群组: ${groupMessagePollingModule.targetGroupId}")
+        appendLine("机器人昵称: $selfNickName (ID: $selfId)")
+        appendLine("冷却时间: ${cooldownMillis / 1000} 秒")
+        appendLine("RCON 命令路径: $rconPath")
+        appendLine("RCON 配置文件路径: $rconConfigPath")
+        appendLine("RCON 超时时间: $rconTimeOut ms")
+        appendLine("关键词触发: ${keywords.joinToString(", ")}")
+        appendLine("状态文件路径: ${stateFile.absolutePath}")
+        appendLine("状态备份文件路径: ${stateBackupFile.absolutePath}")
+        appendLine("上次触发消息ID: ${lastTriggerState.lastTriggeredRealId}")
+        appendLine("上次触发时间: ${lastTriggerState.lastTriggerTime}")
+    }
+
+    // 返回模块使用帮助
+    override fun help(): String = buildString {
+        appendLine("使用帮助 - RconPlayerListModule")
+        appendLine("功能: 查询服务器 TPS 和在线玩家列表，通过关键词触发或冷却机制限制频率")
+        appendLine("触发关键词: ${keywords.joinToString(", ")}")
+        appendLine("示例:")
+        keywords.forEach { keyword ->
+            appendLine("  - 在群里发送 \"$keyword\" 将触发 RCON 查询")
+        }
+        appendLine("注意事项:")
+        appendLine("  - 查询冷却时间为 ${cooldownMillis / 1000} 秒")
+        appendLine("  - RCON 查询可能受服务器响应时间影响")
+        appendLine("  - 查询结果会以转发消息形式发送到群组")
     }
 
 }

@@ -1,6 +1,6 @@
-package top.r3944realms.ltdmanager.module.common
+package top.r3944realms.ltdmanager.module.common.cooldown
 
 sealed class CooldownScope {
-    object Global : CooldownScope()
-    object PerUser : CooldownScope()
+    data object Global : CooldownScope()
+    data object PerUser : CooldownScope()
 }

@@ -1,4 +1,4 @@
-package top.r3944realms.ltdmanager.module.common
+package top.r3944realms.ltdmanager.module.common.cooldown
 
 interface CooldownStateProvider<S> {
     fun load(): S

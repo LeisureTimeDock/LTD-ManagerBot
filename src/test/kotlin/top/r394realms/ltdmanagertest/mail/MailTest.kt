@@ -13,6 +13,7 @@ fun main() = GlobalManager.runBlockingMain {
     val mailModule = mailConfig.port?.let { portIt ->
         mailConfig.mailAddress?.let { mailAddressIt ->
             MailModule(
+                moduleName = "WhiteListGroup",
                 host = mailConfig.host.toString(),
                 authToken = mailConfig.decryptedPassword.toString(),
                 port = portIt,
@@ -29,7 +30,7 @@ fun main() = GlobalManager.runBlockingMain {
     val expireHours = 24 // 有效期 24 小时
     val expireTime = LocalDateTime.now().plusHours(expireHours.toLong())
         .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
-    val bodyC = HtmlTemplateUtil.renderTemplate(template.file.toString(), mapOf(
+    val bodyC = HtmlTemplateUtil.renderTemplateFromClasspath(template.file.toString(), mapOf(
         "player_name" to "小明",
         "activation_code" to "ABC123",
         "expire_time" to expireTime,

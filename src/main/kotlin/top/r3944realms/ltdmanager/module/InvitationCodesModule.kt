@@ -8,11 +8,18 @@ import top.r3944realms.ltdmanager.blessingskin.request.invitecode.GenerateInvita
 import top.r3944realms.ltdmanager.blessingskin.response.ResponseResult
 import top.r3944realms.ltdmanager.blessingskin.response.invitecode.InvitationCodeGenerationResponse
 import top.r3944realms.ltdmanager.core.mail.mail
+import top.r3944realms.ltdmanager.module.common.cooldown.CooldownManager
+import top.r3944realms.ltdmanager.module.common.cooldown.CooldownScope
+import top.r3944realms.ltdmanager.module.common.cooldown.CooldownStateProvider
+import top.r3944realms.ltdmanager.module.common.filter.TriggerMessageFilter
+import top.r3944realms.ltdmanager.module.common.filter.type.CooldownFilter
+import top.r3944realms.ltdmanager.module.common.filter.type.IgnoreSelfFilter
+import top.r3944realms.ltdmanager.module.common.filter.type.KeywordFilter
+import top.r3944realms.ltdmanager.module.common.filter.type.NewMessageFilter
 import top.r3944realms.ltdmanager.module.exception.InvitationCodeException
 import top.r3944realms.ltdmanager.napcat.NapCatClient
 import top.r3944realms.ltdmanager.napcat.data.ID
 import top.r3944realms.ltdmanager.napcat.data.MessageElement
-import top.r3944realms.ltdmanager.napcat.data.MessageType
 import top.r3944realms.ltdmanager.napcat.event.message.GetFriendMsgHistoryEvent
 import top.r3944realms.ltdmanager.napcat.request.other.SendGroupMsgRequest
 import top.r3944realms.ltdmanager.utils.HtmlTemplateUtil
@@ -63,24 +70,67 @@ api格式 https://skins.r3944realms.top/api/invitation-codes/generate?token=XXXX
 */
 
 class InvitationCodesModule(
+    moduleName: String,
     private val groupMessagePollingModule: GroupMessagePollingModule,
     private val mailModule: MailModule,
     private val apiToken: String,
-    private val selfId: Long,
+    selfId: Long,
     private val cooldownMillis: Long = 120_000,
     private val keywords: Set<String> = setOf("申请邀请码")
-) : BaseModule(), PersistentState<InvitationCodesModule.LastTriggerMapState> {
+) : BaseModule("InvitationCodesModule", moduleName), PersistentState<InvitationCodesModule.LastTriggerMapState> {
 
-    override val name: String = "InvitationCodesModule"
     private var scope: CoroutineScope? = null
+    private val stateFile: File = getStateFileInternal("invitation_codes_quarry_state.json", name)
+    private val stateBackupFile: File = getStateFileInternal("invitation_codes_quarry_state.json.bak", name)
+    private val cooldownManager by lazy{ CooldownManager(
+            cooldownMillis = cooldownMillis,
+            scope = CooldownScope.PerUser,
+            stateProvider = object : CooldownStateProvider<LastTriggerMapState> {
+                override fun load() = loadState()
+                override fun save(state: LastTriggerMapState) = saveState(state)
+            },
+            getLastTrigger = { state, qq ->
+                val detail = state.map[qq]
+                (detail?.time ?: -1L) to (detail?.lastCooldownRealId ?: -1L)
+            },
+            updateTrigger = { state, qq, realId, time ->
+                val id = requireNotNull(qq)
+                state.updateLastTrigger(id, realId, time)
+            },
+            updateCooldownRealId = { state, qq, realId ->
+                val id = requireNotNull(qq)
+                state.updateLastCooldownRealId(id, realId)
+            },
+            groupId = groupMessagePollingModule.targetGroupId
+        )
+    }
+    // 在 InvitationCodesModule 类里添加：
+    private val triggerFilter = TriggerMessageFilter(
+        listOf(
+            IgnoreSelfFilter(selfId),
+            NewMessageFilter { qq ->
+                lastTriggerMapState.getLastTriggerTime(qq) to lastTriggerMapState.getLastTriggerRealId(qq)
+            },
+            KeywordFilter(keywords),
+            CooldownFilter(
+                cooldownManager = cooldownManager,
+                sendCooldown = { msg, remain ->
+                    sendCooldownMessage(
+                        napCatClient,
+                        msg.userId,
+                        msg.realId,
+                        "⏳ 申请邀请码过于频繁（剩余 $remain 秒后自动申请）"
+                    )
+                }
+            )
+        )
+    )
 
-    // 持久化文件（带锁 + 备份）
-    private val stateFile = getStateFile("mc_server_status_state.json")
-    private val stateBackupFile = getStateFile("invitation_codes_quarry_state.json.bak")
+
     private val fileLock = ReentrantLock()
 
     private var lastTriggerMapState = loadState()
-    override fun getStateFile(): File = stateFile
+    override fun getStateFileInternal(): File = stateFile
     override fun getState(): LastTriggerMapState = lastTriggerMapState
     override fun onLoad() {
         LoggerUtil.logger.info("[$name] 模块已装载，目标群组: ${groupMessagePollingModule.targetGroupId}")
@@ -135,29 +185,17 @@ class InvitationCodesModule(
     }
 
     /** 过滤出符合条件的触发消息 */
-    private fun filterTriggerMessages(messages: List<GetFriendMsgHistoryEvent.SpecificMsg>)
-            : List<GetFriendMsgHistoryEvent.SpecificMsg> {
+    private suspend fun filterTriggerMessages(
+        messages: List<GetFriendMsgHistoryEvent.SpecificMsg>
+    ): List<GetFriendMsgHistoryEvent.SpecificMsg> {
 
-        val filtered = messages.asSequence()
-            .filter { msg ->
-                msg.userId != selfId &&
-                        (msg.time > lastTriggerMapState.getLastTriggerTime(msg.userId) ||
-                                (msg.time == lastTriggerMapState.getLastTriggerTime(msg.userId)
-                                        && msg.realId > lastTriggerMapState.getLastTriggerRealId(msg.userId))) &&
-                        msg.message.any { seg ->
-                            seg.type == MessageType.Text &&
-                                    seg.data.text?.let { text -> keywords.any { keyword -> text == keyword } } == true
-                        }
-            }
+        // 先应用通用过滤器
+        val filtered = triggerFilter.filter(messages)
+
+        // 再做 groupBy -> 只保留每个用户最新一条
+        return filtered
             .groupBy { it.userId }
             .mapNotNull { (_, msgs) -> msgs.maxByOrNull { it.time } }
-            .filter { runBlocking { filterCoolDownMessage(it) } }
-            .toList()
-
-        if (filtered.isNotEmpty()) {
-            LoggerUtil.logger.info("[$name] 待处理消息队列: $filtered")
-        }
-        return filtered
     }
 
     private suspend fun getIdAndSelectSituation(msgs: List<GetFriendMsgHistoryEvent.SpecificMsg>,
@@ -356,33 +394,6 @@ class InvitationCodesModule(
             client.sendUnit(request)
             LoggerUtil.logger.info("[$name] 已发送 失败消息[无指定对象]")
         }
-    }
-
-    // =========================
-    // 冷却逻辑
-    // =========================
-    private suspend fun filterCoolDownMessage(msg: GetFriendMsgHistoryEvent.SpecificMsg): Boolean {
-        val triggerDetail = lastTriggerMapState.map[msg.userId]
-        val lastTriggerTime = triggerDetail?.time ?: -1L
-        val lastCooldownRealId = triggerDetail?.lastCooldownRealId ?: -1L
-        val nowSec = System.currentTimeMillis() / 1000  // 转成秒
-
-        if (lastTriggerTime == -1L || nowSec - lastTriggerTime >= cooldownMillis / 1000) {
-            // 正常触发
-            return true
-        }
-
-        // 冷却中，如果本消息未发送过冷却提示
-        if (msg.realId != lastCooldownRealId) {
-            val remaining = ((cooldownMillis / 1000) - (nowSec - lastTriggerTime)).coerceAtLeast(1)
-            val msgText = "⏳ 申请邀请码过于频繁（剩余 $remaining 秒后将为你自动申请）"
-            sendCooldownMessage(napCatClient, msg.userId, msg.realId, msgText)
-
-            // 记录这条消息已发送过冷却提示
-            lastTriggerMapState = lastTriggerMapState.updateLastCooldownRealId(msg.userId, msg.realId)
-        }
-
-        return false
     }
 
     private suspend fun sendCooldownMessage(client: NapCatClient, qq: Long, realId: Long, msg: String) {
@@ -645,6 +656,35 @@ class InvitationCodesModule(
                 LoggerUtil.logger.error("[$name] 保存状态失败", e)
             }
         }
+    }
+    // 在 InvitationCodesModule 类中补全：
+    override fun info(): String {
+        return """
+        模块: $name
+        功能: 自动处理群组内“申请邀请码”消息
+        描述: 
+          1. 监听群消息，过滤关键词和冷却
+          2. 根据QQ号查询白名单状态
+          3. 自动创建或发送邀请码，并通过邮件发送
+          4. 已触发和未触发状态会持久化保存
+        关键词: $keywords
+        冷却时间: ${cooldownMillis / 1000} 秒
+        目标群组: ${groupMessagePollingModule.targetGroupId}
+    """.trimIndent()
+    }
+
+    override fun help(): String {
+        return """
+        使用说明:
+        1. 在群里发送${keywords}触发本模块
+        2. 模块会自动判断你的白名单状态
+            - 若已使用过邀请码，会提醒你不要重复申请
+            - 若已有邀请码但未使用，会重新发送邮件提醒
+            - 若未生成邀请码，会调用API生成并发送邮件
+        3. 请求过于频繁时，会有冷却提示
+        4. 所有操作都有日志记录，可供管理员审计
+        5. 异常情况会发送失败提示消息
+    """.trimIndent()
     }
 
 }

@@ -11,12 +11,11 @@ import top.r3944realms.ltdmanager.napcat.request.group.SetGroupAddRequestRequest
 import top.r3944realms.ltdmanager.utils.LoggerUtil
 
 class GroupRequestHandlerModule(
+    moduleName: String,
     private val client: NapCatClient,
     private val targetGroupId: Long,
     private val pollIntervalMillis: Long = 30_000L,
-) : BaseModule() {
-
-    override val name: String = "GroupRequestHandlerModule"
+) : BaseModule("GroupRequestHandlerModule", moduleName) {
 
     private var scope: CoroutineScope? = null
 
@@ -176,4 +175,7 @@ class GroupRequestHandlerModule(
             return data.invitedRequest + data.joinRequests
         }
     }
+    override fun info(): String = "模块: $name\n功能: 自动处理群组加群请求\n版本: 1.0"
+
+    override fun help(): String = "本模块会轮询群组加群请求并根据数据库白名单自动同意或拒绝"
 }

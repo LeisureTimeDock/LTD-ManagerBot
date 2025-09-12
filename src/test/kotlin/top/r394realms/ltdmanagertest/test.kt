@@ -7,6 +7,7 @@ import top.r3944realms.ltdmanager.module.GroupRequestHandlerModule
 fun main() = GlobalManager.runBlockingMain {
     // 创建模块实例
     val groupModule = GroupRequestHandlerModule(
+        moduleName = "WhiteListGroup",
         client = GlobalManager.napCatClient,
         targetGroupId = 538751386
     )

@@ -21,33 +21,36 @@ import kotlin.random.Random
 /**
  * 指令触发禁言模块
  */
-class CommandBanModule(
+class BanModule(
     moduleName: String,
     private val groupMessagePollingModule : GroupMessagePollingModule,
     private val selfId: Long,
     commandPrefixList: List<String> = listOf("/mute"), // 默认命令前缀
     private val minBanMinutes: Int = 1,
     private val maxBanMinutes: Int = 15
-) : BaseModule("CommandBanModule", moduleName), PersistentState<CommandBanModule.BanState> {
+) : BaseModule("BanModule", moduleName), PersistentState<BanModule.BanState> {
 
     private val commandParser = CommandParser(commandPrefixList)
     private val commandFilter = CommandFilter(commandParser)
-    private val banState = loadState()
+    private val stateFile: File = getStateFileInternal("command_ban_state.json", name)
+    private val stateBackupFile: File = getStateFileInternal("command_ban_state.json.bak", name)
+    private var banState = loadState()
     override fun getState(): BanState = banState
 
     private val triggerFilter by lazy {
         TriggerMessageFilter(
             listOf(
                 IgnoreSelfFilter(selfId),
-                NewMessageFilter { _ -> banState.lastTriggerTime to banState.lastTriggerRealId },
+                NewMessageFilter { userId ->
+                    banState.getLastTriggerTime(userId) to banState.getLastTriggerRealId(userId)
+                },
                 commandFilter
             )
         )
     }
 
     private var scope: CoroutineScope? = null
-    private val stateFile: File = getStateFileInternal("command_ban_state.json", name)
-    private val stateBackupFile: File = getStateFileInternal("command_ban_state.json.bak", name)
+
 
     override fun getStateFileInternal(): File = stateFile
 
@@ -105,8 +108,8 @@ class CommandBanModule(
             sendGroupMessage("✅ 你已被禁言 $durationMinutes 分钟", msg.realId)
 
             // 更新状态（保证状态保存正确）
-            banState.lastTriggerRealId = msg.realId
-            banState.lastTriggerTime = msg.time
+            // 禁言成功后更新状态
+            banState = banState.updateLastTrigger(targetUserId, msg.realId, msg.time)
             saveState(banState)
 
         } catch (e: Exception) {
@@ -152,10 +155,27 @@ class CommandBanModule(
 
     // ---------------- 持久化 ----------------
     @Serializable
-    data class BanState(
-        var lastTriggerRealId: Long = -1,
-        var lastTriggerTime: Long = 0
+    data class UserBanDetail(
+        val realId: Long,
+        val time: Long,
     )
+
+    @Serializable
+    data class BanState(
+        val map: Map<Long, UserBanDetail> = emptyMap()
+    ) {
+        fun getLastTriggerTime(userId: Long): Long = map[userId]?.time ?: -1
+        fun getLastTriggerRealId(userId: Long): Long = map[userId]?.realId ?: -1
+
+        fun updateLastTrigger(userId: Long, realId: Long, time: Long = -1): BanState {
+            val old = map[userId]
+            val newTime = if (time != -1L) time else old?.time ?: -1
+            val newMap = map.toMutableMap().apply {
+                put(userId, UserBanDetail(realId, newTime))
+            }
+            return copy(map = newMap)
+        }
+    }
 
     override fun saveState(state: BanState) {
         try {

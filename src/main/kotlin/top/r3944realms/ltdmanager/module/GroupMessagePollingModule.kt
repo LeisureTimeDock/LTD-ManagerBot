@@ -11,12 +11,11 @@ import top.r3944realms.ltdmanager.napcat.request.message.GetGroupMsgHistoryReque
 import top.r3944realms.ltdmanager.utils.LoggerUtil
 
 class GroupMessagePollingModule(
+    moduleName: String,
     val targetGroupId: Long,
     private val pollIntervalMillis: Long = 5_000L,
-    private val msgHistoryCheck: Int = 15
-) : BaseModule() {
-
-    override val name: String = "MessagePollingModule"
+    private val msgHistoryCheck: Int = 15,
+) : BaseModule("MessagePollingModule", moduleName) {
     private var scope: CoroutineScope? = null
 
     // 用 Flow 存消息，其他模块可以订阅

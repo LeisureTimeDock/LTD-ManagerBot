@@ -6,6 +6,9 @@ class ModuleManager {
 
     private val modules = mutableMapOf<String, BaseModule>()
 
+    fun getModules(): Map<String, BaseModule> {
+        return (modules).toMap()
+    }
     /**
      * 注册模块到管理器
      */
@@ -72,6 +75,13 @@ class ModuleManager {
                 LoggerUtil.logger.warn("卸载模块 ${module.name} 失败", e)
             }
         }
+    }
+
+    /**
+     * 提供获取所有模块信息的方法
+     */
+    fun getAllModuleInfo(): Map<String, String> {
+        return modules.mapValues { it.value.info() }
     }
 
     /**

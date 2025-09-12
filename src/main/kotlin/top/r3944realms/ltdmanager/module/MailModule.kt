@@ -10,6 +10,7 @@ import java.util.concurrent.LinkedBlockingQueue
 import kotlin.concurrent.thread
 
 class MailModule(
+    moduleName: String,
     private val protocol: String = "SMTP",
     private val host: String,
     private val port: Int,
@@ -18,9 +19,7 @@ class MailModule(
     private val enableAuth: Boolean = true,
     private val enableTLS: Boolean = true,
     private val intervalMillis: Long = 2000L // 每封邮件之间的间隔（默认 2s）
-) : BaseModule() {
-
-    override val name: String = "MailModule"
+) : BaseModule("MailModule", moduleName) {
 
     private lateinit var session: Session
     private val queue = LinkedBlockingQueue<Mail>()  // 邮件队列
@@ -141,5 +140,37 @@ class MailModule(
         }
 
         Transport.send(message)
+    }
+    override fun info(): String {
+        return buildString {
+            appendLine("[$name] 邮件发送模块")
+            appendLine("功能: 异步发送邮件，支持收件人/抄送/密送，支持 HTML 或纯文本邮件。")
+            appendLine("SMTP 配置:")
+            appendLine(" - 协议: $protocol")
+            appendLine(" - 主机: $host")
+            appendLine(" - 端口: $port")
+            appendLine(" - 发件人邮箱: $senderEmailAddress")
+            appendLine(" - 身份认证: ${if (enableAuth) "启用" else "禁用"}")
+            appendLine(" - TLS/SSL: ${if (enableTLS) "启用" else "禁用"}")
+            appendLine("队列行为:")
+            appendLine(" - 邮件发送间隔: ${intervalMillis}ms")
+            appendLine(" - 队列长度: ${queue.size}")
+            appendLine(" - 当前发送线程状态: ${if (workerThread?.isAlive == true) "运行中" else "未运行"}")
+        }
+    }
+
+    override fun help(): String {
+        return buildString {
+            appendLine("📖 [$name] 使用帮助:")
+            appendLine("1. 创建 Mail 对象，设置收件人、主题和正文")
+            appendLine("   例如: Mail(to = listOf(\"example@mail.com\"), subject = \"测试\", body = \"Hello\")")
+            appendLine("2. 调用 enqueue(mail) 加入发送队列")
+            appendLine("   邮件将异步发送，间隔 $intervalMillis ms")
+            appendLine("3. 模块卸载时会自动停止发送线程")
+            appendLine()
+            appendLine("注意:")
+            appendLine(" - 确保 SMTP 配置正确，否则发送失败")
+            appendLine(" - 发件人邮箱需要允许 SMTP/授权码登录")
+        }
     }
 }

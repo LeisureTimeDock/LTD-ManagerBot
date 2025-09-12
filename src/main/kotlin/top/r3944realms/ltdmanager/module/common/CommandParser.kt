@@ -1,11 +1,14 @@
-package top.r3944realms.ltdmanager.module.util
+package top.r3944realms.ltdmanager.module.common
 
 /**
  * 命令解析器
  * 严格模式：只支持命令后带空格的情况，避免误读
  */
 class CommandParser(private val commands: List<String>) {
-
+    /**
+     * 获取指令
+     */
+    fun getCommands(): List<String> = commands
     /**
      * 解析命令
      * @param text 输入的文本

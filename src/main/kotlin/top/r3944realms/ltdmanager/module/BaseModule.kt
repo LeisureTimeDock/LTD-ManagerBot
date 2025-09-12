@@ -9,12 +9,12 @@ import kotlin.coroutines.cancellation.CancellationException
  * 模块抽象基类
  * 所有功能模块都继承该类
  */
-abstract class BaseModule {
+abstract class BaseModule(baseName : String = "BaseModule", idName : String = "")  {
 
     /**
      * 模块名称
      */
-    abstract val name: String
+    val name: String = "$baseName-#$idName";
 
     /**
      * 停止信号
@@ -74,6 +74,13 @@ abstract class BaseModule {
         LoggerUtil.syncInfo("[$name] 模块已安全停止")
     }
     /**
+     * 模块说明 / 帮助信息
+     * 默认返回空字符串，子类可重写提供具体帮助文本
+     */
+    open fun help(): String = ""
+    /** 模块基础信息，用于 HelpModule 显示 */
+    open fun info(): String =  "模块 $name 未提供详细信息"
+    /**
      * 提供访问全局 NapCatClient 的快捷方式
      */
     protected val napCatClient get() = GlobalManager.napCatClient
@@ -86,8 +93,13 @@ abstract class BaseModule {
      */
     protected val mcSrvStatusClient get() = GlobalManager.mcSrvStatusClient
     /**
+     * 提供访问全局 加载模块 的快捷方式
+     */
+    protected val moduleMap get() = GlobalManager.moduleManager.getModules()
+    /**
      * 获取数据库连接
      * 使用 try-with-resources 时会自动关闭
      */
     protected fun getConnection() = GlobalManager.getConnection()
+
 }

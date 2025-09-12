@@ -4,6 +4,15 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import top.r3944realms.ltdmanager.mcserver.McServerStatus
+import top.r3944realms.ltdmanager.module.common.CommandParser
+import top.r3944realms.ltdmanager.module.common.cooldown.CooldownManager
+import top.r3944realms.ltdmanager.module.common.cooldown.CooldownScope
+import top.r3944realms.ltdmanager.module.common.cooldown.CooldownStateProvider
+import top.r3944realms.ltdmanager.module.common.filter.TriggerMessageFilter
+import top.r3944realms.ltdmanager.module.common.filter.type.CommandFilter
+import top.r3944realms.ltdmanager.module.common.filter.type.CooldownFilter
+import top.r3944realms.ltdmanager.module.common.filter.type.IgnoreSelfFilter
+import top.r3944realms.ltdmanager.module.common.filter.type.NewMessageFilter
 import top.r3944realms.ltdmanager.napcat.NapCatClient
 import top.r3944realms.ltdmanager.napcat.data.ID
 import top.r3944realms.ltdmanager.napcat.data.MessageElement
@@ -17,30 +26,72 @@ import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
 class McServerStatusModule(
+    moduleName: String,
     private val groupMessagePollingModule: GroupMessagePollingModule,
     private val selfId: Long,
     private val selfNickName: String,
-    private val cooldownSeconds: Long = 60,
+    private val cooldownMillis: Long = 60_000L,
     private val commands: List<String> = listOf("/mcs", "/s"),
     private val presetServer: Map<Set<String>, String> = mapOf(
         setOf("hp", "hypixel") to "mc.hypixel.net",
         setOf("pm", "mineplex") to "play.mineplex.com"
     )
-) : BaseModule(), PersistentState<McServerStatusModule.CooldownState> {
+) : BaseModule("McServerStatusModule", moduleName), PersistentState<McServerStatusModule.CooldownState> {
+    private val stateFile:File = getStateFileInternal("mc_server_status_state.json", name)
+    private val stateBackupFile:File = getStateFileInternal("mc_server_status_state.json.bak", name)
+    private val commandParser: CommandParser = CommandParser(commands)
+
+    private val cooldownManager by lazy {
+        CooldownManager(
+            cooldownMillis = cooldownMillis,
+            scope = CooldownScope.PerUser,
+            stateProvider = object : CooldownStateProvider<CooldownState> {
+                override fun load() = loadState()
+                override fun save(state: CooldownState) = saveState(state)
+            },
+            getLastTrigger = { state, qq ->
+                val detail = state.map[qq]
+                (detail?.time ?: -1L) to (detail?.lastCooldownRealId ?: -1L)
+            },
+            updateTrigger = { state, qq, realId, time ->
+                val id = requireNotNull(qq) { "userId required for per-user cooldown" }
+                state.updateLastTrigger(id, realId, time) }
+            ,
+            updateCooldownRealId = { state, qq, realId ->
+                val id = requireNotNull(qq) { "userId required for per-user cooldown" }
+                state.updateLastCooldownRealId(id, realId)
+            },
+            groupId = groupMessagePollingModule.targetGroupId
+        )
+    }
+    private val triggerFilter = TriggerMessageFilter(
+        listOf(
+            IgnoreSelfFilter(selfId),
+            NewMessageFilter { qq ->
+                cooldownState.getLastTriggerTime(qq) to cooldownState.getLastTriggerRealId(qq)
+            },
+            CommandFilter(commandParser),
+            CooldownFilter(
+                cooldownManager = cooldownManager,
+                sendCooldown = { msg, remaining ->
+                    sendCooldownMessage(napCatClient, msg.realId, "⏳ 查询过于频繁， $remaining 秒后执行查询，切勿重复发送")
+                }
+            )
+        )
+    )
+
     private val presetServerByAlias: Map<String, String> by lazy {
         presetServer.flatMap { (aliases, ip) ->
             aliases.map { it.lowercase() to ip }
         }.toMap()
     }
     fun getServerIp(alias: String): String? = presetServerByAlias[alias.lowercase()]
-    override val name: String = "McServerStatusModule"
     private var scope: CoroutineScope? = null
-    private val stateFile = getStateFile("mc_server_status_state.json")
-    private val stateBackupFile = getStateFile("mc_server_status_state.json.bak")
+
     private val fileLock = ReentrantLock()
     private var cooldownState = loadState()
 
-    override fun getStateFile(): File = stateFile
+    override fun getStateFileInternal(): File = stateFile
     override fun getState(): CooldownState = cooldownState
 
     override fun onLoad() {
@@ -76,32 +127,11 @@ class McServerStatusModule(
             saveState(cooldownState)
         }
     }
-    private suspend fun filterTriggerMessages(messages: List<GetFriendMsgHistoryEvent.SpecificMsg>)
-            : List<GetFriendMsgHistoryEvent.SpecificMsg> {
 
-        val filtered = messages.asSequence()
-            .filter { msg ->
-                // 忽略自己消息
-                msg.userId != selfId &&
-                        // 新消息判断
-                        (msg.time > cooldownState.getLastTriggerTime(msg.userId) ||
-                                (msg.time == cooldownState.getLastTriggerTime(msg.userId) &&
-                                        msg.realId > cooldownState.getLastTriggerRealId(msg.userId)))
-            }
-            .filter { msg ->
-                // 检查命令
-                msg.message.any { seg ->
-                    seg.type == MessageType.Text &&
-                            (
-                                    seg.data.text?.let { text -> commands.any { cmd -> text.startsWith(cmd) } } == true
-                            )
-                }
-            }
-            .filter { runBlocking { handleCooldown(it) } } // 这里处理冷却
-            .toList()
+    private suspend fun filterTriggerMessages(
+        messages: List<GetFriendMsgHistoryEvent.SpecificMsg>
+    ): List<GetFriendMsgHistoryEvent.SpecificMsg> = triggerFilter.filter(messages)
 
-        return filtered
-    }
     private suspend fun sendFailedMessage(
         client: NapCatClient,
         qq: Long? = null,
@@ -129,31 +159,7 @@ class McServerStatusModule(
             LoggerUtil.logger.info("[$name] 已发送 失败消息[无指定对象]")
         }
     }
-    /** 冷却提示消息 */
-
-   private suspend fun handleCooldown(msg: GetFriendMsgHistoryEvent.SpecificMsg): Boolean {
-        val trigger = cooldownState.map[msg.userId]
-        val lastTriggerTime = trigger?.time ?: -1L
-        val lastCooldownRealId = trigger?.lastCooldownRealId ?: -1L
-        val nowSec = System.currentTimeMillis() / 1000
-
-        // 未触发过或者已超过冷却
-        if (lastTriggerTime == -1L || nowSec - lastTriggerTime >= cooldownSeconds) {
-            return true
-        }
-
-        // 冷却中且未发送过冷却提示
-        if (msg.realId != lastCooldownRealId) {
-            val remaining = ((cooldownSeconds - (nowSec - lastTriggerTime))).coerceAtLeast(1)
-            val msgText = "⏳ 查询过于频繁， $remaining 秒后执行查询，切勿重复发送"
-            sendCooldownMessage(napCatClient, msg.userId, msg.realId, msgText)
-            cooldownState = cooldownState.updateLastCooldownRealId(msg.userId, msg.realId)
-        }
-
-        return false
-    }
-
-    private suspend fun sendCooldownMessage(client: NapCatClient, qq: Long, realId: Long, text: String) {
+    private suspend fun sendCooldownMessage(client: NapCatClient, realId: Long, text: String) {
         val request = SendGroupMsgRequest(
             MessageElement.reply(ID.long(realId), text),
             ID.long(groupMessagePollingModule.targetGroupId)
@@ -171,16 +177,18 @@ class McServerStatusModule(
             ?.trim()
             ?: return
 
-        // 解析命令
-        val matchedCommand = commands.firstOrNull { text.startsWith(it) } ?: return
-        var address = text.removePrefix(matchedCommand).trim()
+        // 使用命令解析器解析命令
+        val parsedCommand = commandParser.parseCommand(text) ?: return
+        val (_, address) = parsedCommand
 
         // 使用预设别名替换
-        presetServerByAlias[address.lowercase()]?.let { presetIp ->
-            address = presetIp
+        val finalAddress = if (address.isNotEmpty()) {
+            presetServerByAlias[address.lowercase()] ?: address
+        } else {
+            ""
         }
 
-        if (address.isEmpty()) {
+        if (finalAddress.isEmpty()) {
             sendFailedMessage(
                 napCatClient,
                 msg.userId,
@@ -192,9 +200,8 @@ class McServerStatusModule(
         }
 
         try {
-            val status = mcSrvStatusClient.getServerStatus(address) // 返回 McServerStatus
+            val status = mcSrvStatusClient.getServerStatus(finalAddress)
 
-            // 检查是否查询失败
             if (!status.online) {
                 sendFailedMessage(
                     napCatClient, msg.userId, msg.realId, msg.time,
@@ -203,9 +210,7 @@ class McServerStatusModule(
                 return
             }
 
-            // 查询成功，发送状态消息
-            sendStatusForwardMessage(napCatClient, msg, address, status, msg.realId, msg.time)
-
+            sendStatusForwardMessage(napCatClient, msg, finalAddress, status, msg.realId, msg.time)
         } catch (e: Exception) {
             LoggerUtil.logger.error("查询服务器状态失败: $address", e)
             sendFailedMessage(
@@ -311,23 +316,36 @@ class McServerStatusModule(
     data class CooldownState(
         val map: Map<Long, TriggerDetail> = emptyMap()
     ) {
+        // 获取上次处理时间
         fun getLastTriggerTime(qq: Long): Long = map[qq]?.time ?: -1
+
+        // 获取上次处理消息ID
         fun getLastTriggerRealId(qq: Long): Long = map[qq]?.realId ?: -1
-        fun updateLastTrigger(qq: Long, realId: Long, time: Long = -1): CooldownState {
+
+        // 获取上次冷却消息ID
+        fun getLastCooldownRealId(qq: Long): Long = map[qq]?.lastCooldownRealId ?: -1
+
+        // 冷却结束，允许处理消息 → 更新 time 和 realId
+        fun updateLastTrigger(qq: Long, realId: Long, time: Long): CooldownState {
             val old = map[qq]
-            val newTime = if (time != -1L) time else old?.time ?: -1
             val newMap = map.toMutableMap().apply {
-                put(qq, TriggerDetail(realId, newTime, old?.lastCooldownRealId ?: -1))
+                put(qq, TriggerDetail(
+                    realId = realId,                       // 当前允许处理消息ID
+                    time = time,                           // 当前允许处理消息时间
+                    lastCooldownRealId = old?.lastCooldownRealId ?: -1 // 保留冷却中记录的消息ID
+                ))
             }
             return copy(map = newMap)
         }
+
+        // 冷却中消息 → 只更新 lastCooldownRealId，保留 time 和 realId
         fun updateLastCooldownRealId(qq: Long, realId: Long): CooldownState {
             val old = map[qq]
             val newMap = map.toMutableMap().apply {
                 put(qq, TriggerDetail(
-                    realId = old?.realId ?: -1,
-                    time = old?.time ?: -1,
-                    lastCooldownRealId = realId
+                    realId = old?.realId ?: -1,           // 保持上次允许处理的消息ID
+                    time = old?.time ?: -1,               // 保持上次允许处理的时间
+                    lastCooldownRealId = realId           // 更新当前冷却拒绝的消息ID
                 ))
             }
             return copy(map = newMap)
@@ -336,9 +354,9 @@ class McServerStatusModule(
 
     @Serializable
     data class TriggerDetail(
-        val realId: Long,
-        val time: Long,
-        val lastCooldownRealId: Long = -1L
+        val realId: Long,             // 上次允许处理消息ID
+        val time: Long,               // 上次允许处理消息时间（秒）
+        val lastCooldownRealId: Long = -1 // 上次被冷却拒绝的消息ID
     )
 
     override fun loadState(): CooldownState {
@@ -367,5 +385,34 @@ class McServerStatusModule(
                 LoggerUtil.logger.error("[$name] 保存状态失败", e)
             }
         }
+    }
+    override fun info(): String {
+        return buildString {
+            appendLine("模块名称: $name")
+            appendLine("模块类型: McServerStatusModule")
+            appendLine("目标群组: ${groupMessagePollingModule.targetGroupId}")
+            appendLine("机器人昵称: $selfNickName (ID: $selfId)")
+            appendLine("冷却时间: ${cooldownMillis / 1000} 秒")
+            appendLine("支持命令: ${commands.joinToString(", ")}")
+            appendLine("预设服务器别名:")
+            presetServer.forEach { (aliases, ip) ->
+                appendLine("  ${aliases.joinToString("/")} -> $ip")
+            }
+            appendLine("状态文件路径: ${stateFile.absolutePath}")
+            appendLine("状态备份文件路径: ${stateBackupFile.absolutePath}")
+        }
+    }
+    // 返回模块使用帮助
+    override fun help(): String = buildString {
+        appendLine("使用帮助 - McServerStatusModule")
+        appendLine("指令格式: /mcs <服务器别名或IP> 或 /s <服务器别名或IP>")
+        appendLine("示例:")
+        presetServerByAlias.forEach { (alias, ip) ->
+            appendLine("  /mcs $alias -> 查询服务器 $ip 状态")
+        }
+        appendLine("注意事项:")
+        appendLine("  - 查询冷却时间为 ${cooldownMillis / 1000} 秒")
+        appendLine("  - 输入服务器 IP 或别名均可")
+        appendLine("  - 查询结果会以转发消息形式发送到群组")
     }
 }

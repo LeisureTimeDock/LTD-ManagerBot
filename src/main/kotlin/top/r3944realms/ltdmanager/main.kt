@@ -88,9 +88,10 @@ fun main() = GlobalManager.runBlockingMain {
         maxBanMinutes = 15,
     )
     val modGroupHandlerModule = ModGroupHandlerModule(
-        moduleName = "ModGrouup",
+        moduleName = "ModGroup",
         targetGroupId = 339340846,
         answers = listOf("戏鸢", "一只戏鸢", "折戏鸢", "LostInLinearPast", "lostinlinearpast"),
+        pollIntervalMillis = 15_000L,
     )
 
     // 注册模块到全局模块管理器

@@ -20,6 +20,14 @@ class ModuleManager {
         modules[module.name] = module
         LoggerUtil.logger.info("模块注册: ${module.name}")
     }
+    /**
+     * 注册多模块到管理器
+     */
+    fun registerModules(moduleList: List<BaseModule>) {
+        for (module in moduleList) {
+            registerModule(module)
+        }
+    }
 
     /**
      * 加载指定模块

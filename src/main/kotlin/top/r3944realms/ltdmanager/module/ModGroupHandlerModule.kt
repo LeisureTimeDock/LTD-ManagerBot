@@ -136,10 +136,12 @@ class ModGroupHandlerModule(
 
         provider?.getAllRequests()?.forEach { request ->
             if (!request.checked && request.groupId == targetGroupId) {
-                LoggerUtil.logger.info("[$name] 处理请求: requestId=${request.requestId}, actor=${request.actor}")
-                val answerAllow = answers.contains(request.message)
-                if(answerAllow) {
-                    val info = napCatClient.send<GetStrangerInfoEvent>(GetStrangerInfoRequest(ID.long(request.requestId)))
+                LoggerUtil.logger.info("[$name] 处理请求: requestId=${request.requestId},requestQQ =${request.invitorUin}")
+                val pattern = """答案：(.*)""".toRegex()
+                val answer = pattern.find(request.message)?.groupValues?.get(1) ?: ""
+                val answerAllow = answers.contains(answer)
+                if (answerAllow) {
+                    val info = napCatClient.send<GetStrangerInfoEvent>(GetStrangerInfoRequest(ID.long(request.invitorUin)))
                     val levelAllow = info.data.qqLevel >= 16
                     val setRequest = SetGroupAddRequestRequest(
                         levelAllow,
@@ -147,32 +149,57 @@ class ModGroupHandlerModule(
                         if(!levelAllow) "QQ等级低于16级" else ""
                     )
                     napCatClient.send<NapCatEvent>(setRequest)
-                    if (levelAllow) napCatClient.send<NapCatEvent>(SendGroupMsgRequest(listOf(MessageElement.text(formatRejectRecordMessage(request.requestId))), ID.long(targetGroupId)))
-                    LoggerUtil.logger.info("[$name] 已${if (levelAllow) "同意" else "拒绝"}请求${if(!levelAllow) ",等级不够,${info.data.qqLevel}" else "" }: ${request.requestId}")
+                    if (levelAllow) {
+                        napCatClient.send<NapCatEvent>(
+                            SendGroupMsgRequest(
+                                listOf(
+                                    MessageElement.at(ID.long(request.invitorUin), request.requesterNick),
+                                    MessageElement.text("\n"),
+                                    MessageElement.text(
+                                        formatRejectRecordMessage(request.invitorUin)
+                                    )
+                                ), ID.long(targetGroupId)
+                            )
+                        )
+                    }
+                    LoggerUtil.logger.info("[$name] 已${if (levelAllow) "同意" else "拒绝"} 请求${if(!levelAllow) ",等级不够,${info.data.qqLevel}" else "" }: ${request.requestId}")
+                    if(levelAllow) stateCache?.records?.remove(request.invitorUin)
                 } else {
-                    napCatClient.sendUnit(SetGroupAddRequestRequest(false, request.requestId.toString(), "答案错误,拒绝次数：${getRejectRecord(request.requestId)?.rejectCount}"))
-                    addReject(request.actor, "答案错误:${request.message}")
-                    LoggerUtil.logger.info("[$name] 答案错误：${request.message}，已拒绝请求: ${request.requestId}")
+                    val rejectCount = (getRejectRecord(request.invitorUin)?.rejectCount ?: 0) + 1
+                    napCatClient.sendUnit(SetGroupAddRequestRequest(false, request.requestId.toString(), "答案错误,请输入标准答案,拒绝次数：${rejectCount}"))
+                    addReject(request.invitorUin, answer)
+                    LoggerUtil.logger.info("[$name] 答案错误：${answer}，已拒绝请求: ${request.requestId}")
                 }
 
             }
         }
     }
-    fun formatRejectRecordMessage(userId: Long): String {
+    private fun formatRejectRecordMessage(userId: Long): String {
         val record = getRejectRecord(userId)
         return if (record != null) {
             """
-        用户QQ号：${record.userId}
-        尝试次数：${record.rejectCount}
-        最终评分：${rate(record.rejectCount)} 
-        尝试答案：【${record.reason.joinToString("，")}】
-        """.trimIndent()
+    📊 用户审核记录
+    ──────────────────
+    🔹 用户QQ号：${record.userId}
+    🔹 尝试次数：${record.rejectCount}
+    🔹 最终评分：${rate(record.rejectCount)} 
+    
+    📝 尝试答案：
+    ${ "\n" + record.reason.joinToString("\n") { "   • $it" }}
+    
+    ⚠️ 提示：请仔细阅读文档后再在群里提问，否则你会失去你的大脑🧠
+    """.trimIndent()
         } else {
             """
-        用户QQ号：${userId}
-        尝试次数：0
-        最终评分：SSS  
-        """.trimIndent()
+    📊 用户审核记录
+    ──────────────────
+    🔹 用户QQ号：${userId}
+    🔹 尝试次数：0
+    🔹 最终评分：SSS ⭐
+    
+    💡 该用户尚未有审核记录
+    ⚠️ 提示：请仔细阅读文档后再在群里提问，否则你会失去你的大脑🧠
+    """.trimIndent()
         }
     }
     private fun rate(count: Int): String = when (count) {

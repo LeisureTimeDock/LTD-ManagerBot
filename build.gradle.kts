@@ -1,5 +1,7 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
+fun k(v: String) = project.property(v) as String
+
 plugins {
     kotlin("jvm") version "1.9.23"
     kotlin("plugin.serialization") version "1.9.23" // 添加序列化插件
@@ -7,8 +9,8 @@ plugins {
     id("com.github.johnrengelman.shadow") version "8.0.0" // fat jar
 }
 
-group = project.property("project_group") as String
-version = project.property("project_version") as String
+group = k("project_group")
+version = k("project_version")
 
 repositories {
 
@@ -58,6 +60,16 @@ repositories {
 
         // 协程
         implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+        implementation("org.apache.commons:commons-lang3:3.17.0")
+        implementation("com.google.guava:guava:33.3.0-jre")
+
+        //DG_Lab 依赖库导入
+        implementation("io.netty:netty-all:4.1.109.Final")
+        implementation("com.google.code.gson:gson:2.10.1")
+        implementation(files("libs/DgLab-common-${k("dg_lab_version")}.jar"))
+
+        //生成 二维码
+        implementation("com.google.zxing:core:[3.5.3,)")
 
         // 测试
         testImplementation(kotlin("test"))

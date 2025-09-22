@@ -1,7 +1,12 @@
 package top.r394realms.ltdmanagertest.mod
 
+import kotlinx.coroutines.delay
 import top.r3944realms.ltdmanager.GlobalManager
+import top.r3944realms.ltdmanager.GlobalManager.napCatClient
 import top.r3944realms.ltdmanager.module.ModGroupHandlerModule
+import top.r3944realms.ltdmanager.napcat.data.ID
+import top.r3944realms.ltdmanager.napcat.data.MessageType
+import top.r3944realms.ltdmanager.napcat.request.message.SendForwardMsgRequest
 
 
 fun main() = GlobalManager.runBlockingMain {

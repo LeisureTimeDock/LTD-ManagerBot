@@ -153,6 +153,11 @@ class RconPlayerListModule(
             LoggerUtil.logger.error("[$name] RCON 查询失败", ex)
             if (ex is TimeoutException) {
                 sendFailedMessage(napCatClient, msg.realId, msg.time, "⏳ RCON 连接超时")
+                // ✅ 更新触发状态 & 持久化
+                lastTriggerState.lastTriggeredRealId = msg.realId
+                lastTriggerState.lastTriggerTime = msg.time
+                saveState(lastTriggerState)
+                return
             }
             throw ex
         }.onSuccess { output ->

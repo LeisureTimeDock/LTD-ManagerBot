@@ -23,6 +23,7 @@ fun main() = GlobalManager.runBlockingMain {
     )
     val helpModule = HelpModule(
         moduleName = "WhiteListGroup",
+        keywords = listOf("help", "帮助"),
         groupMessagePollingModule = groupMsgPollingModule,
         selfId = selfQQId,
         selfNickName = selfNickName,
@@ -83,16 +84,18 @@ fun main() = GlobalManager.runBlockingMain {
         moduleName = "WhiteListGroup",
         groupMessagePollingModule = groupMsgPollingModule,
         selfId = selfQQId,
-        commandPrefixList = listOf("口球", "mute", "杂鱼三九"),
+        adminsId = listOf(1283411677),
+        muteCommandPrefixList = listOf("口球", "mute", "Mute", "禁言"),
+        unmuteCommandPrefixList = listOf("解禁", "unmute", "Unmute", "解除禁言"),
         minBanMinutes = 1,
         maxBanMinutes = 15,
     )
-    val modGroupHandlerModule = ModGroupHandlerModule(
-        moduleName = "ModGroup",
-        targetGroupId = 339340846,
-        answers = listOf("戏鸢", "一只戏鸢", "折戏鸢", "LostInLinearPast", "lostinlinearpast"),
-        pollIntervalMillis = 15_000L,
-    )
+//    val modGroupHandlerModule = ModGroupHandlerModule(
+//        moduleName = "ModGroup",
+//        targetGroupId = 339340846,
+//        answers = listOf("戏鸢", "一只戏鸢", "折戏鸢", "LostInLinearPast", "lostinlinearpast"),
+//        pollIntervalMillis = 15_000L,
+//    )
 
     // 注册模块到全局模块管理器
     GlobalManager.moduleManager.registerModule(groupModule)
@@ -103,7 +106,7 @@ fun main() = GlobalManager.runBlockingMain {
     GlobalManager.moduleManager.registerModule(invitationCodesModule)
     GlobalManager.moduleManager.registerModule(helpModule)
     GlobalManager.moduleManager.registerModule(banModule)
-    GlobalManager.moduleManager.registerModule(modGroupHandlerModule)
+//    GlobalManager.moduleManager.registerModule(modGroupHandlerModule)
 
     // 加载模块
     GlobalManager.moduleManager.loadModule(groupModule.name)
@@ -114,5 +117,5 @@ fun main() = GlobalManager.runBlockingMain {
     GlobalManager.moduleManager.loadModule(invitationCodesModule.name)
     GlobalManager.moduleManager.loadModule(helpModule.name)
     GlobalManager.moduleManager.loadModule(banModule.name)
-    GlobalManager.moduleManager.loadModule(modGroupHandlerModule.name)
+//    GlobalManager.moduleManager.loadModule(modGroupHandlerModule.name)
 }

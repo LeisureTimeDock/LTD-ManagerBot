@@ -34,6 +34,7 @@ object YamlConfigLoader {
         config?.mail?.encryptPassword()
         config?.tools?.rcon?.encryptPassword()
         config?.blessingSkinServer?.invitationApi?.encryptToken()
+        config?.dgLab?.wsServer?.encryptPassword()
     }
     private fun loadConfig(): ConfigWrapper {
         if (!Files.exists(configFilePath)) {
@@ -76,6 +77,7 @@ object YamlConfigLoader {
     fun loadToolConfig(): ToolConfig = config.tools
     fun loadMailConfig(): MailConfig = config.mail
     fun loadBlessingSkinServerConfig(): BlessingSkinServerConfig = config.blessingSkinServer
+    fun loadDgLabConfig(): DgLabConfig = config.dgLab
     data class ConfigWrapper(
         var database: DatabaseConfig = DatabaseConfig(),
         var crypto: CryptoConfig = CryptoConfig(),
@@ -85,6 +87,7 @@ object YamlConfigLoader {
         var tools: ToolConfig = ToolConfig(),
         var mail: MailConfig = MailConfig(),
         var blessingSkinServer: BlessingSkinServerConfig = BlessingSkinServerConfig(),
+        var dgLab: DgLabConfig = DgLabConfig(),
 
     )
 }

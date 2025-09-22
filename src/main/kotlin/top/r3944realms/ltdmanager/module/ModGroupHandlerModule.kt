@@ -187,7 +187,7 @@ class ModGroupHandlerModule(
     📝 尝试答案：
     ${ "\n" + record.reason.joinToString("\n") { "   • $it" }}
     
-    ⚠️ 提示：请仔细阅读文档后再在群里提问，否则你会失去你的大脑🧠
+    ⚠️ 提示：请仔细阅读群文档后再在群里提问，否则你会失去你的大脑🧠
     """.trimIndent()
         } else {
             """
@@ -198,7 +198,7 @@ class ModGroupHandlerModule(
     🔹 最终评分：SSS ⭐
     
     💡 该用户尚未有审核记录
-    ⚠️ 提示：请仔细阅读文档后再在群里提问，否则你会失去你的大脑🧠
+    ⚠️ 提示：请仔细阅读群文档后再在群里提问，否则你会失去你的大脑🧠
     """.trimIndent()
         }
     }

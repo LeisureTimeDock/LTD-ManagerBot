@@ -42,4 +42,62 @@ blessing-skin-server:
     path: "/api/invitation-codes/generate"
     # 格式为 ENC(XXX),若不是则会在加载完成配置后自动加密
     encrypted-token: "your-secret-token"
-
+dg-lab:
+  ws-server:
+    local-server-url: "0.0.0.0"
+    local-server-port: 4567
+    local-server-publish-url: "ws://127.0.0.1:4567"
+    local-server-secure: false
+    local-server-ssl-cert: "config/cert.p12"
+    local-server-ssl-key: "config/key.p12"
+    encrypted-local-server-ssl-password: "ENC(xxxxx)"
+  dg-lab-client:
+    bind-timeout: 90.0
+    register-timeout: 30.0
+  pulse-data:
+    custom-pulse-data: "data/dg-lab-play/customPulseData.json"
+    duration-per-post: 8.0
+    post-interval: 1.0
+    sleep-after-clear: 0.5
+  command-text:
+    append-pulse: "增加波形"
+    current-pulse: "当前波形"
+    current-strength: "当前强度"
+    decrease-strength: "减小强度"
+    dg-lab-device-join: "绑定郊狼"
+    exit-game: "退出游戏"
+    increase-strength: "加大强度"
+    random-pulse: "随机波形"
+    random-strength: "随机强度"
+    reset-pulse: "重置波形"
+    show-players: "当前玩家"
+    show-pulses: "可用波形"
+    usage: "郊狼玩法"
+  reply-text:
+    bind-timeout: "绑定超时"
+    current-players: "当前玩家："
+    current-pulse: "当前波形循环为：【{}】"
+    current-strength: "A通道：{0}/{1} B通道：{2}/{3}"
+    failed-to-create-client: "创建 DG-Lab 控制终端失败"
+    failed-to-fetch-strength-info: "获取通道强度状态失败"
+    failed-to-fetch-strength-limit: "获取通道强度上限失败，控制失败"
+    game-exited: "已退出游戏"
+    invalid-pulse-param: "波形参数错误，控制失败"
+    invalid-strength-param: "强度参数错误，控制失败"
+    invalid-target: "目标玩家不存在或郊狼 App 未绑定"
+    no-available-pulse: "无可用波形"
+    no-player: "当前没有已连接的玩家，你可以绑定试试~"
+    not-bind-yet: "你目前没有绑定 DG-Lab App"
+    please-at-target: "使用命令的同时请 @ 想要控制的玩家"
+    please-scan-qrcode: "请用 DG-Lab App 扫描二维码以连接"
+    please-set-pulse-first: "请先设置郊狼波形：{}"
+    pulses-empty: "当前波形循环为空"
+    successfully-bind: "绑定成功，可以开始色色了！"
+    successfully-decreased: "郊狼强度减小了 {}%"
+    successfully-increased: "郊狼强度加强了 {}%！"
+    successfully-set-pulse: "郊狼波形成功设置为【{}】！"
+    successfully-set-to-strength: "郊狼强度成功设置为 {}%！"
+  debug:
+    enable-debug: false
+    ide-host: "127.0.0.1"
+    ide-port: 5678

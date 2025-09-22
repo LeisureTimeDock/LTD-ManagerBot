@@ -1,51 +1,85 @@
 package top.r394realms.ltdmanagertest.msg
 
+import kotlinx.coroutines.delay
 import top.r3944realms.ltdmanager.GlobalManager
+import top.r3944realms.ltdmanager.module.ModGroupHandlerModule
 import top.r3944realms.ltdmanager.napcat.NapCatClient
 import top.r3944realms.ltdmanager.napcat.data.ID
-import top.r3944realms.ltdmanager.napcat.data.MessageElement
-import top.r3944realms.ltdmanager.napcat.request.other.SendGroupMsgRequest
+import top.r3944realms.ltdmanager.napcat.data.MessageType
+import top.r3944realms.ltdmanager.napcat.request.message.SendForwardMsgRequest
+
 fun main() = GlobalManager.runBlockingMain {
     val napCatClient = NapCatClient.create()
-
-    // 生成9x9乘法表字符串
-    val multiplicationTable = buildString {
-        for (i in 1..9) {
-            for (j in 1..i) {
-                append("$j×$i=${i * j}\t")
-            }
-            appendLine() // 换行
-        }
-    }
-
-    // 生成对齐检查字符
-    val alignmentCheck = buildString {
-        appendLine("📏 对齐检查（每个数字占位）：")
-        appendLine("1234567890") // 数字标尺
-        appendLine("─".repeat(20)) // 分隔线
-
-        for (i in 1..9) {
-            for (j in 1..i) {
-                val product = i * j
-                val placeholder = "X".repeat("$j×$i=$product".length)
-                append("$placeholder\t")
-            }
-            appendLine()
-        }
-    }
-
-    napCatClient.sendUnit(
-        SendGroupMsgRequest(
-            listOf(
-                MessageElement.at(ID.long(2561098830), "幸福亮亮"),
-                MessageElement.text("\n"),
-                MessageElement.text("9×9乘法表：\n"),
-                MessageElement.text(multiplicationTable),
-                MessageElement.text("\n────────────────────\n"),
-                MessageElement.text(alignmentCheck),
-                MessageElement.text("\n提问前，请看文档，不看文档就提问直接肘击（")
-            ),
-            ID.long(339340846)
-        )
+ formatAndSendForwardMessage(napCatClient, 2561098830L, "幸福亮亮")
+}
+private suspend fun formatAndSendForwardMessage(napCatClient: NapCatClient ,userId: Long, requesterNick: String) {
+    // 虚拟数据 - 模拟有审核记录的情况
+    val virtualRecord = ModGroupHandlerModule.RejectRecord(
+        userId = userId,
+        reason = mutableListOf(
+            "模组作者是张三",
+            "作者是李四",
+            "制作人是王五",
+            "我不知道",
+            "可能是赵六吧"
+        ),
+        rejectCount = 5
     )
+
+    // 虚拟数据 - 模拟无审核记录的情况（注释掉下面这行来测试）
+    // val virtualRecord = null
+
+    val record = virtualRecord
+    val content = """
+    📊 用户审核记录
+    ──────────────────
+    🔹 用户QQ号：${record.userId}
+    🔹 尝试次数：${record.rejectCount}
+    🔹 最终评分：${rate(record.rejectCount)} 
+    
+    📝 尝试答案：
+    ${"\n" + record.reason.joinToString("\n") { "   • $it" }}
+    
+    ⚠️ 提示：请仔细阅读文档后再在群里提问，否则你会失去你的大脑🧠
+    """.trimIndent()
+
+    // 创建合并转发消息
+    val forwardRequest = SendForwardMsgRequest(
+        groupId = ID.long(339340846),
+        messages = listOf(
+            SendForwardMsgRequest.TopForwardMsg(
+                data = SendForwardMsgRequest.MessageData(
+                    content = listOf(
+                        SendForwardMsgRequest.Message(
+                            data = SendForwardMsgRequest.PurpleData(
+                                text = content
+                            ),
+                            type = MessageType.Text
+                        )
+                    ),
+                    nickname = "审核系统",
+                    userId = ID.long(0) // 系统ID
+                ),
+                type = MessageType.Text
+            )
+        ),
+        news = listOf(
+            SendForwardMsgRequest.ForwardModelNews("用户审核记录详情")
+        ),
+        prompt = "📋 ${requesterNick}入群审核评分${rate(record.rejectCount ?: 0)}",
+        source = "审核系统",
+        summary = "点击查看用户 $requesterNick 的审核详情"
+    )
+
+    // 发送合并转发消息
+    napCatClient.sendUnit(forwardRequest)
+}
+
+private fun rate(count: Int): String = when (count) {
+    0 -> "SSS"
+    1 -> "A"
+    2 -> "B"
+    3 -> "C"
+    4 -> "D"
+    else -> "F"
 }

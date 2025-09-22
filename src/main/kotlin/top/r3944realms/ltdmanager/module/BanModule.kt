@@ -6,12 +6,15 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import top.r3944realms.ltdmanager.module.common.CommandParser
 import top.r3944realms.ltdmanager.module.common.filter.TriggerMessageFilter
-import top.r3944realms.ltdmanager.module.common.filter.type.CommandFilter
 import top.r3944realms.ltdmanager.module.common.filter.type.IgnoreSelfFilter
+import top.r3944realms.ltdmanager.module.common.filter.type.MultiCommandFilter
 import top.r3944realms.ltdmanager.module.common.filter.type.NewMessageFilter
 import top.r3944realms.ltdmanager.napcat.data.ID
 import top.r3944realms.ltdmanager.napcat.data.MessageElement
+import top.r3944realms.ltdmanager.napcat.data.MessageType
+import top.r3944realms.ltdmanager.napcat.event.group.GetGroupShutListEvent
 import top.r3944realms.ltdmanager.napcat.event.message.GetFriendMsgHistoryEvent
+import top.r3944realms.ltdmanager.napcat.request.group.GetGroupShutListRequest
 import top.r3944realms.ltdmanager.napcat.request.group.SetGroupBanRequest
 import top.r3944realms.ltdmanager.napcat.request.other.SendGroupMsgRequest
 import top.r3944realms.ltdmanager.utils.LoggerUtil
@@ -25,13 +28,18 @@ class BanModule(
     moduleName: String,
     private val groupMessagePollingModule : GroupMessagePollingModule,
     private val selfId: Long,
-    commandPrefixList: List<String> = listOf("/mute"), // 默认命令前缀
+    private val adminsId: List<Long> = listOf(),
+    muteCommandPrefixList: List<String> = listOf("mute"), // 默认命令前缀
+    unmuteCommandPrefixList: List<String> = listOf("unmute"),
     private val minBanMinutes: Int = 1,
-    private val maxBanMinutes: Int = 15
+    private val maxBanMinutes: Int = 15,
+    private val factorX: Int = 2,         // 系数 x，禁言倍数
+
 ) : BaseModule("BanModule", moduleName), PersistentState<BanModule.BanState> {
 
-    private val commandParser = CommandParser(commandPrefixList)
-    private val commandFilter = CommandFilter(commandParser)
+    private val banCommandParse = CommandParser(muteCommandPrefixList)
+    private val pardonCommandParse = CommandParser(unmuteCommandPrefixList)
+    private val multiCommandFilter = MultiCommandFilter(listOf(banCommandParse, pardonCommandParse))
     private val stateFile: File = getStateFileInternal("command_ban_state.json", name)
     private val stateBackupFile: File = getStateFileInternal("command_ban_state.json.bak", name)
     private var banState = loadState()
@@ -44,7 +52,7 @@ class BanModule(
                 NewMessageFilter { userId ->
                     banState.getLastTriggerTime(userId) to banState.getLastTriggerRealId(userId)
                 },
-                commandFilter
+                multiCommandFilter
             )
         )
     }
@@ -75,6 +83,7 @@ class BanModule(
         val filtered = triggerFilter.filter(messages)
         for (msg in filtered) {
             processBanCommand(msg)
+            processUnBanCommand(msg)
         }
     }
     /**
@@ -88,45 +97,160 @@ class BanModule(
             seg.data.qq?.let { "@${it}" } ?: (seg.data.text ?: "")
         }.trim()
     }
+    /**
+     * 从消息段中提取所有被 @ 的用户 ID
+     */
+    private fun GetFriendMsgHistoryEvent.SpecificMsg.getMentionedUserIds(): List<ID> {
+        return this.message
+            .filter { it.type == MessageType.At && it.data.qq != null }
+            .mapNotNull { it.data.qq }
+            .distinctBy {
+                when (it) {
+                    is ID.StringValue -> it.value
+                    is ID.LongValue -> it.value
+                }
+            }
+    }
+    private suspend fun processUnBanCommand(msg: GetFriendMsgHistoryEvent.SpecificMsg) {
+        try {
+            pardonCommandParse.parseCommand(msg.plainText()) ?: return
+            // 获取所有被 @ 的用户
+            val mentionedUserIds = msg.getMentionedUserIds().map {
+                when (it) {
+                    is ID.StringValue -> it.value.toLong()
+                    is ID.LongValue -> it.value
+                }
+            } // List<Long>
+            val send =
+                napCatClient.send<GetGroupShutListEvent>(GetGroupShutListRequest(ID.long(groupMessagePollingModule.targetGroupId)))
+            val muteList = send.data.map { it.uin.toLong() }
+            for (target in mentionedUserIds) {
+                if(target !in muteList) {
+                    sendGroupMessage("❌ 目标用户未被禁言",
+                        msg.realId
+                    )
+                } else {
+                    banUser(ID.long(target), groupMessagePollingModule.targetGroupId, 0)
+                    sendGroupMessage(
+                        "✅ 已解禁对方@(${target})",
+                        msg.realId
+                    )
+                }
+
+            }
+
+            // 更新状态
+            banState = banState.updateLastTrigger(msg.userId, msg.realId, msg.time)
+            saveState(banState)
+        } catch (e: Exception) {
+            LoggerUtil.logger.error("[$name] 执行解禁言指令失败", e)
+            sendGroupMessage("❌ 执行解禁言失败，请检查解指令格式或权限", msg.realId)
+            banState = banState.updateLastTrigger(msg.sender.userId, msg.realId, msg.time)
+            saveState(banState)
+        }
+    }
     private suspend fun processBanCommand(msg: GetFriendMsgHistoryEvent.SpecificMsg) {
         try {
-            val parsed = commandParser.parseCommand(msg.plainText()) ?: return
-            val (command, argument) = parsed
+            val parsed = banCommandParse.parseCommand(msg.plainText()) ?: return
+            val (_, argument) = parsed
 
-            // 参数格式： [分钟]
-            // 示例：/mute 5  → 自己禁言 5 分钟
-            //       /mute    → 自己随机禁言
             val parts = argument.split(" ").filter { it.isNotBlank() }
 
+            // 解析禁言时间
             val durationMinutes = parts.getOrNull(0)?.toIntOrNull()
                 ?: Random.nextInt(minBanMinutes, maxBanMinutes + 1)
             val durationSeconds = durationMinutes.coerceIn(minBanMinutes, maxBanMinutes) * 60
 
-            val targetUserId = msg.sender.userId
+            // 获取所有被 @ 的用户
+            val mentionedUserIds = msg.getMentionedUserIds() // List<ID>
+            val targets = mentionedUserIds.ifEmpty { listOf(ID.long(msg.sender.userId)) }
 
-            banUser(targetUserId, groupMessagePollingModule.targetGroupId, durationSeconds)
-            sendGroupMessage("✅ 你已被禁言 $durationMinutes 分钟", msg.realId)
+            for (target in targets) {
+                val targetLongId = when (target) {
+                    is ID.StringValue -> target.value.toLong()
+                    is ID.LongValue -> target.value
+                }
 
-            // 更新状态（保证状态保存正确）
-            // 禁言成功后更新状态
-            banState = banState.updateLastTrigger(targetUserId, msg.realId, msg.time)
+                // 权限检查：非管理员不能禁言他人
+                if (mentionedUserIds.isNotEmpty() && mentionedUserIds.size != 1 && msg.sender.userId !in adminsId) {
+                    sendGroupMessage("❌ 你没有权限禁言使用禁言多用户功能", msg.realId)
+                    continue
+                }
+
+                // 禁言机器人跳过
+                if (targetLongId == selfId) {
+                    sendGroupMessage("❌ 你没有权限禁言机器人", msg.realId)
+                    continue
+                }
+                if (targetLongId in adminsId) {
+                    sendGroupMessage("❌ 不支持禁言管理员", msg.realId)
+                    continue
+                }
+
+                // 单 @ 且非自己，可能触发反禁自己
+                if (mentionedUserIds.size == 1 && targetLongId != msg.sender.userId && msg.sender.userId !in adminsId) {
+                    val dice = Random.nextInt(1, 7) // 1~6
+                    val chance = when (dice) {
+                        6 -> 100
+                        5 -> 80
+                        4 -> 60
+                        3 -> 50
+                        2 -> 20
+                        1 -> 0
+                        else -> 0
+                    }
+
+                    val selfDuration = durationSeconds * factorX
+                    if (Random.nextInt(100) < chance) {
+                        // 触发反禁自己
+                        banUser(ID.long(msg.sender.userId), groupMessagePollingModule.targetGroupId, selfDuration)
+                        sendGroupMessage(
+                            "⚠️ 骰子点数: $dice, 成功概率: ${chance}% → 失败，你触发了反禁，禁言 ${selfDuration / 60} 分钟",
+                            msg.realId
+                        )
+                    } else {
+                        // 未触发反禁自己，禁言目标
+                        banUser(target, groupMessagePollingModule.targetGroupId, durationSeconds)
+                        sendGroupMessage(
+                            "✅ 骰子点数: $dice, 成功概率: ${chance}% → 成功禁言 <@${targetLongId}>",
+                            msg.realId
+                        )
+                    }
+                } else {
+                    // 多 @ 或管理员操作，直接禁言目标
+                    banUser(target, groupMessagePollingModule.targetGroupId, durationSeconds)
+                    sendGroupMessage(
+                        if (targetLongId == msg.sender.userId) {
+                            "✅ 你已被禁言 ${durationSeconds/ 60} 分钟"
+                        } else {
+                            "✅ 已禁言 <@${targetLongId}> ${durationSeconds/ 60} 分钟"
+                        },
+                        msg.realId
+                    )
+                }
+
+
+            }
+            // 更新状态
+            banState = banState.updateLastTrigger(msg.userId, msg.realId, msg.time)
             saveState(banState)
-
         } catch (e: Exception) {
             LoggerUtil.logger.error("[$name] 执行禁言指令失败", e)
             sendGroupMessage("❌ 执行禁言失败，请检查指令格式或权限", msg.realId)
+            banState = banState.updateLastTrigger(msg.sender.userId, msg.realId, msg.time)
+            saveState(banState)
         }
     }
-    private suspend fun banUser(userId: Long, groupId: Long, seconds: Int) {
+
+    private suspend fun banUser(userId: ID, groupId: Long, seconds: Int) {
         val request = SetGroupBanRequest(
             duration = seconds.toDouble(),
             groupId = ID.long(groupId),
-            userId = ID.long(userId)
+            userId = userId
         )
         napCatClient.sendUnit(request)
         LoggerUtil.logger.info("[$name] 已对用户 $userId 执行 $seconds 秒禁言")
     }
-
     private suspend fun sendGroupMessage(text: String, replyTo: Long? = null) {
         val request = SendGroupMsgRequest(
             MessageElement.reply(ID.long(replyTo ?: 0), text),
@@ -136,20 +260,36 @@ class BanModule(
     }
 
     override fun info(): String {
-        return "[$name] 指令禁言模块：用户发送 ${commandParser.getCommands().joinToString("、")} 来禁言自己，" +
-                "支持指定分钟数或随机分钟数，范围 $minBanMinutes-$maxBanMinutes 分钟。"
+        return buildString {
+            append("[$name] 指令禁言模块：\n")
+            append(" - 用户发送 ${banCommandParse.getCommands().joinToString("、")} 来禁言自己或指定其他用户（需管理员权限）。\n")
+            append(" - 支持指定禁言分钟数或随机分钟数，范围 $minBanMinutes-$maxBanMinutes 分钟。\n")
+            append(" - 支持对单个 @ 用户禁言，有概率反禁自己（骰子点数决定概率）。\n")
+            append(" - 管理员可以禁言其他用户；非管理员尝试多个禁言对象会收到无权限提示。\n")
+            append(" - 用户发送 ${pardonCommandParse.getCommands().joinToString("、")} 来解禁指定用户。\n")
+            append(" - 仅支持对单个 @ 用户解禁言。\n")
+        }
     }
 
     override fun help(): String {
         return buildString {
             appendLine("📖 [$name] 使用帮助：")
-            appendLine(" - ${commandParser.getCommands().joinToString("、")} [分钟]")
-            appendLine("   · 不写分钟数 → 随机禁言 (范围 $minBanMinutes-$maxBanMinutes 分钟)")
-            appendLine("   · 写分钟数 → 自己禁言指定分钟数")
-            appendLine()
+            appendLine("指令格式：${banCommandParse.getCommands().joinToString("、")} [分钟] [@用户...]")
             appendLine("示例：")
-            appendLine(" - /mute       → 随机禁言自己")
-            appendLine(" - /mute 5     → 禁言自己 5 分钟")
+            appendLine(" - <指令>             → 随机禁言自己")
+            appendLine(" - <指令> 5           → 禁言自己 5 分钟")
+            appendLine(" - <指令> 4 @User123  → 禁言指定用户 4 分钟（可能失败）")
+            appendLine(" - <指令> 4 @User123 @User22  → 禁言指定多用户 4 分钟（需在程序管理员列表中）")
+            appendLine()
+            appendLine("⚠️ 特殊说明：")
+            appendLine(" - 如果 @ 单个用户且执行者非需在程序管理员，有 y% 概率触发反禁自己，")
+            appendLine("   骰子点数决定概率：6 → 100%, 5 → 80%, 4 → 60%, 3 → 50%, 2 → 20%, 1 → 0%")
+            appendLine(" - 禁言机器人自身不会生效")
+            appendLine(" - 禁言状态会自动保存以便下次使用")
+            appendLine()
+            appendLine("指令格式：${pardonCommandParse.getCommands().joinToString("、")} [@用户]")
+            appendLine("示例：")
+            appendLine(" - <指令> @User123  → 解禁指定用户")
         }
     }
 

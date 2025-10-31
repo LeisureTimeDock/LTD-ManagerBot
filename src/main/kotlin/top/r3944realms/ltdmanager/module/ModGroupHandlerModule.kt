@@ -93,7 +93,7 @@ class ModGroupHandlerModule(
         }
         saveState(state)
     }
-    fun getRejectRecord(userId: Long): RejectRecord? {
+    private fun getRejectRecord(userId: Long): RejectRecord? {
         return getState().records[userId]
     }
 

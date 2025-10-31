@@ -1,4 +1,4 @@
-package top.r3944realms.ltdmanager.chevereto
+package top.r3944realms.ltdmanager.chevereto.data
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -7,6 +7,8 @@ import kotlinx.serialization.Serializable
 data class CheveretoResponse(
     @SerialName("status_code")
     val statusCode: Int,
-    val success: Map<String, String>? = null,
-    val image: CheveretoImage? = null
+    val success: Success? = null,
+    val image: CheveretoImage? = null,
+    @SerialName("status_txt")
+    val statusTxt:String ?= null
 )

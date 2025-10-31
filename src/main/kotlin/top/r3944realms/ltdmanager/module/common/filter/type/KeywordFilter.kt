@@ -2,11 +2,11 @@ package top.r3944realms.ltdmanager.module.common.filter.type
 
 import top.r3944realms.ltdmanager.module.common.filter.MessageFilter
 import top.r3944realms.ltdmanager.napcat.data.MessageType
-import top.r3944realms.ltdmanager.napcat.event.message.GetFriendMsgHistoryEvent
+import top.r3944realms.ltdmanager.napcat.data.msghistory.MsgHistorySpecificMsg
 
 /** 文本关键词匹配 */
 class KeywordFilter(private val keywords: Set<String>) : MessageFilter {
-    override suspend fun test(msg: GetFriendMsgHistoryEvent.SpecificMsg): Boolean {
+    override suspend fun test(msg: MsgHistorySpecificMsg): Boolean {
         return msg.message.any { seg ->
             seg.type == MessageType.Text && seg.data.text?.let { text ->
                 keywords.any { keyword -> text.startsWith(keyword) }

@@ -2,6 +2,7 @@ package top.r3944realms.ltdmanager
 
 import kotlinx.coroutines.*
 import top.r3944realms.ltdmanager.blessingskin.BlessingSkinClient
+import top.r3944realms.ltdmanager.chevereto.CheveretoClient
 import top.r3944realms.ltdmanager.core.mysql.MysqlHikariConnectPool
 import top.r3944realms.ltdmanager.mcserver.McSrvStatusClient
 import top.r3944realms.ltdmanager.module.ModuleManager
@@ -28,6 +29,9 @@ object GlobalManager {
     }
     val blessingSkinClient: BlessingSkinClient by lazy {
         BlessingSkinClient.create()
+    }
+    val cheveretoClient: CheveretoClient by lazy {
+        CheveretoClient.create()
     }
 
     val moduleManager: ModuleManager by lazy { ModuleManager() }
@@ -67,7 +71,8 @@ object GlobalManager {
             "NapCatClient" to { napCatClient.close() },
             "McSrvStatusClient" to { mcSrvStatusClient.close() },
             "BlessingSkinClient" to { blessingSkinClient.close() },
-            "Hikari 数据源" to { dataSource.close() }
+            "Hikari 数据源" to { dataSource.close() },
+            "CheveretoClient" to { cheveretoClient.close() }
         )
 
         resources.forEach { (name, closer) ->

@@ -17,7 +17,7 @@ import top.r3944realms.ltdmanager.napcat.NapCatClient
 import top.r3944realms.ltdmanager.napcat.data.ID
 import top.r3944realms.ltdmanager.napcat.data.MessageElement
 import top.r3944realms.ltdmanager.napcat.data.MessageType
-import top.r3944realms.ltdmanager.napcat.event.message.GetFriendMsgHistoryEvent
+import top.r3944realms.ltdmanager.napcat.data.msghistory.MsgHistorySpecificMsg
 import top.r3944realms.ltdmanager.napcat.request.message.SendForwardMsgRequest
 import top.r3944realms.ltdmanager.napcat.request.other.SendGroupMsgRequest
 import top.r3944realms.ltdmanager.utils.LoggerUtil
@@ -37,7 +37,7 @@ class HelpModule(
 
     // 命令解析器
     private val commandParser = CommandParser(keywords)
-    private val GetFriendMsgHistoryEvent.SpecificMsg.textContent: String
+    private val MsgHistorySpecificMsg.textContent: String
         get() = message.joinToString("") { it.data.text ?: "" }
 
     // 持久化文件
@@ -100,7 +100,7 @@ class HelpModule(
         LoggerUtil.logger.info("[$name] 模块已卸载完成")
     }
 
-    private suspend fun handleMessages(messages: List<GetFriendMsgHistoryEvent.SpecificMsg>) {
+    private suspend fun handleMessages(messages: List<MsgHistorySpecificMsg>) {
         val filtered = triggerFilter.filter(messages)
         val triggerMsg = filtered.maxByOrNull { it.time } ?: return
 
@@ -117,7 +117,7 @@ class HelpModule(
         }
     }
 
-    private suspend fun sendAllModulesHelp(msg: GetFriendMsgHistoryEvent.SpecificMsg) {
+    private suspend fun sendAllModulesHelp(msg: MsgHistorySpecificMsg) {
         val messages = moduleMap.map { (name, module) ->
             val textBuilder = StringBuilder()
             textBuilder.appendLine("===== $name =====")
@@ -153,7 +153,7 @@ class HelpModule(
         updateTriggerState(msg)
     }
 
-    private suspend fun sendModuleHelp(msg: GetFriendMsgHistoryEvent.SpecificMsg, moduleName: String, module: BaseModule) {
+    private suspend fun sendModuleHelp(msg: MsgHistorySpecificMsg, moduleName: String, module: BaseModule) {
         val textBuilder = StringBuilder()
         textBuilder.appendLine("===== $moduleName =====")
         textBuilder.appendLine(module.info())
@@ -187,7 +187,7 @@ class HelpModule(
         updateTriggerState(msg)
     }
 
-    private suspend fun sendText(msg: GetFriendMsgHistoryEvent.SpecificMsg, text: String) {
+    private suspend fun sendText(msg: MsgHistorySpecificMsg, text: String) {
         val request = SendGroupMsgRequest(
             MessageElement.reply(ID.long(msg.realId), text),
             ID.long(groupMessagePollingModule.targetGroupId)
@@ -196,7 +196,7 @@ class HelpModule(
         updateTriggerState(msg)
     }
 
-    private fun updateTriggerState(msg: GetFriendMsgHistoryEvent.SpecificMsg) {
+    private fun updateTriggerState(msg: MsgHistorySpecificMsg) {
         lastTriggerState.lastTriggeredRealId = msg.realId
         lastTriggerState.lastTriggerTime = msg.time
         saveState(lastTriggerState)

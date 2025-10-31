@@ -20,7 +20,7 @@ import top.r3944realms.ltdmanager.module.exception.InvitationCodeException
 import top.r3944realms.ltdmanager.napcat.NapCatClient
 import top.r3944realms.ltdmanager.napcat.data.ID
 import top.r3944realms.ltdmanager.napcat.data.MessageElement
-import top.r3944realms.ltdmanager.napcat.event.message.GetFriendMsgHistoryEvent
+import top.r3944realms.ltdmanager.napcat.data.msghistory.MsgHistorySpecificMsg
 import top.r3944realms.ltdmanager.napcat.request.other.SendGroupMsgRequest
 import top.r3944realms.ltdmanager.utils.HtmlTemplateUtil
 import top.r3944realms.ltdmanager.utils.LoggerUtil
@@ -165,14 +165,14 @@ class InvitationCodesModule(
     // =========================
     // 消息处理主流程
     // =========================
-    private suspend fun handleMessages(messages: List<GetFriendMsgHistoryEvent.SpecificMsg>) {
+    private suspend fun handleMessages(messages: List<MsgHistorySpecificMsg>) {
         if (messages.isEmpty()) return
         val triggerMsgs = filterTriggerMessages(messages)
         if (triggerMsgs.isEmpty()) return
 
         try {
-            val hadValidCodeButNotUsed = mutableListOf<Pair<Long, GetFriendMsgHistoryEvent.SpecificMsg>>()
-            val needNewCode = mutableListOf<Pair<Long, GetFriendMsgHistoryEvent.SpecificMsg>>()
+            val hadValidCodeButNotUsed = mutableListOf<Pair<Long, MsgHistorySpecificMsg>>()
+            val needNewCode = mutableListOf<Pair<Long, MsgHistorySpecificMsg>>()
 
             getIdAndSelectSituation(triggerMsgs, hadValidCodeButNotUsed, needNewCode)
             createAndSearchInvitationCodeIdsThenUpdateDate(needNewCode)
@@ -186,8 +186,8 @@ class InvitationCodesModule(
 
     /** 过滤出符合条件的触发消息 */
     private suspend fun filterTriggerMessages(
-        messages: List<GetFriendMsgHistoryEvent.SpecificMsg>
-    ): List<GetFriendMsgHistoryEvent.SpecificMsg> {
+        messages: List<MsgHistorySpecificMsg>
+    ): List<MsgHistorySpecificMsg> {
 
         // 先应用通用过滤器
         val filtered = triggerFilter.filter(messages)
@@ -198,9 +198,9 @@ class InvitationCodesModule(
             .mapNotNull { (_, msgs) -> msgs.maxByOrNull { it.time } }
     }
 
-    private suspend fun getIdAndSelectSituation(msgs: List<GetFriendMsgHistoryEvent.SpecificMsg>,
-                                                hadVaildCodeButNotUseList : MutableList<Pair<Long, GetFriendMsgHistoryEvent.SpecificMsg>>,
-                                                needNewCodeList: MutableList<Pair<Long, GetFriendMsgHistoryEvent.SpecificMsg>>) {
+    private suspend fun getIdAndSelectSituation(msgs: List<MsgHistorySpecificMsg>,
+                                                hadVaildCodeButNotUseList : MutableList<Pair<Long, MsgHistorySpecificMsg>>,
+                                                needNewCodeList: MutableList<Pair<Long, MsgHistorySpecificMsg>>) {
         if (msgs.isEmpty()) return
 
         val qqIds = msgs.map { it.userId }
@@ -273,7 +273,7 @@ class InvitationCodesModule(
             sendFailedMessage(napCatClient, text = "批量查询用户资格信息失败，请联系管理员: ${e.message}")
         }
     }
-    private suspend fun hadVaildCodeButNotUseListHandler(list: List<Pair<Long, GetFriendMsgHistoryEvent.SpecificMsg>>) {
+    private suspend fun hadVaildCodeButNotUseListHandler(list: List<Pair<Long, MsgHistorySpecificMsg>>) {
         if (list.isEmpty()) return
 
         val whiteListIds = list.map { it.first }
@@ -405,7 +405,7 @@ class InvitationCodesModule(
         lastTriggerMapState = lastTriggerMapState.updateLastTrigger(qq, realId, -1)
     }
     private suspend fun createAndSearchInvitationCodeIdsThenUpdateDate(
-        needNewTokenIdAndMsgPairs: List<Pair<Long, GetFriendMsgHistoryEvent.SpecificMsg>>,
+        needNewTokenIdAndMsgPairs: List<Pair<Long, MsgHistorySpecificMsg>>,
     ) {
         if (needNewTokenIdAndMsgPairs.isEmpty()) return
 
@@ -461,7 +461,7 @@ class InvitationCodesModule(
      */
     private fun validateCodeCountMatch(
         invitationCodes: List<InvitationCodeGenerationResponse.InvitationCode>?,
-        needNewTokenIdAndMsgPairs: List<Pair<Long, GetFriendMsgHistoryEvent.SpecificMsg>>
+        needNewTokenIdAndMsgPairs: List<Pair<Long, MsgHistorySpecificMsg>>
     ) {
         if (invitationCodes == null) {
             throw InvitationCodeException.ApiFailureException("获取邀请码请求失败")

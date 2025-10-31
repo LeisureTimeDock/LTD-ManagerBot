@@ -101,3 +101,6 @@ dg-lab:
     enable-debug: false
     ide-host: "127.0.0.1"
     ide-port: 5678
+img-tu:
+  url: https://mysite.com/api/1/upload
+  encrypted-password: 11223344bbcc

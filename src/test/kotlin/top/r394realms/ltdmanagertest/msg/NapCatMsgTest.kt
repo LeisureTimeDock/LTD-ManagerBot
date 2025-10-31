@@ -5,12 +5,19 @@ import top.r3944realms.ltdmanager.GlobalManager
 import top.r3944realms.ltdmanager.module.ModGroupHandlerModule
 import top.r3944realms.ltdmanager.napcat.NapCatClient
 import top.r3944realms.ltdmanager.napcat.data.ID
+import top.r3944realms.ltdmanager.napcat.data.MessageElement
 import top.r3944realms.ltdmanager.napcat.data.MessageType
 import top.r3944realms.ltdmanager.napcat.request.message.SendForwardMsgRequest
+import top.r3944realms.ltdmanager.napcat.request.other.SendPrivateMsgRequest
 
 fun main() = GlobalManager.runBlockingMain {
     val napCatClient = NapCatClient.create()
- formatAndSendForwardMessage(napCatClient, 2561098830L, "幸福亮亮")
+// formatAndSendForwardMessage(napCatClient, 2561098830L, "幸福亮亮")
+    sendTestMsg(napCatClient)
+}
+private suspend fun sendTestMsg(napCatClient: NapCatClient) {
+    val request = SendPrivateMsgRequest(listOf(MessageElement.image("https://pic.xiaobuawa.top/images/2025/09/30/icons8-postgresql-96d4af6da8d4bd8df5.png","图片")),ID.long(2561098830L))
+    napCatClient.sendUnit(request)
 }
 private suspend fun formatAndSendForwardMessage(napCatClient: NapCatClient ,userId: Long, requesterNick: String) {
     // 虚拟数据 - 模拟有审核记录的情况
@@ -45,7 +52,7 @@ private suspend fun formatAndSendForwardMessage(napCatClient: NapCatClient ,user
 
     // 创建合并转发消息
     val forwardRequest = SendForwardMsgRequest(
-        groupId = ID.long(339340846),
+        groupId = ID.long(920719236),
         messages = listOf(
             SendForwardMsgRequest.TopForwardMsg(
                 data = SendForwardMsgRequest.MessageData(

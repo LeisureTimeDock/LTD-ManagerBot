@@ -12,8 +12,8 @@ import top.r3944realms.ltdmanager.module.common.filter.type.NewMessageFilter
 import top.r3944realms.ltdmanager.napcat.data.ID
 import top.r3944realms.ltdmanager.napcat.data.MessageElement
 import top.r3944realms.ltdmanager.napcat.data.MessageType
+import top.r3944realms.ltdmanager.napcat.data.msghistory.MsgHistorySpecificMsg
 import top.r3944realms.ltdmanager.napcat.event.group.GetGroupShutListEvent
-import top.r3944realms.ltdmanager.napcat.event.message.GetFriendMsgHistoryEvent
 import top.r3944realms.ltdmanager.napcat.request.group.GetGroupShutListRequest
 import top.r3944realms.ltdmanager.napcat.request.group.SetGroupBanRequest
 import top.r3944realms.ltdmanager.napcat.request.other.SendGroupMsgRequest
@@ -78,7 +78,7 @@ class BanModule(
         scope?.cancel()
     }
 
-    private suspend fun handleMessages(messages: List<GetFriendMsgHistoryEvent.SpecificMsg>) {
+    private suspend fun handleMessages(messages: List<MsgHistorySpecificMsg>) {
         // 先过一遍过滤器，只有符合条件的才进入后续处理
         val filtered = triggerFilter.filter(messages)
         for (msg in filtered) {
@@ -91,7 +91,7 @@ class BanModule(
      * - text 段直接拼接
      * - 如果消息段里包含 @（在 MessageData 中为 qq 字段），则拼成 "@{qq}"，方便 parseMentionToUserId 解析
      */
-    private fun GetFriendMsgHistoryEvent.SpecificMsg.plainText(): String {
+    private fun MsgHistorySpecificMsg.plainText(): String {
         return this.message.joinToString(" ") { seg ->
             // 如果 message element 包含 qq 字段（即@用户），优先使用它
             seg.data.qq?.let { "@${it}" } ?: (seg.data.text ?: "")
@@ -100,7 +100,7 @@ class BanModule(
     /**
      * 从消息段中提取所有被 @ 的用户 ID
      */
-    private fun GetFriendMsgHistoryEvent.SpecificMsg.getMentionedUserIds(): List<ID> {
+    private fun MsgHistorySpecificMsg.getMentionedUserIds(): List<ID> {
         return this.message
             .filter { it.type == MessageType.At && it.data.qq != null }
             .mapNotNull { it.data.qq }
@@ -111,7 +111,7 @@ class BanModule(
                 }
             }
     }
-    private suspend fun processUnBanCommand(msg: GetFriendMsgHistoryEvent.SpecificMsg) {
+    private suspend fun processUnBanCommand(msg: MsgHistorySpecificMsg) {
         try {
             pardonCommandParse.parseCommand(msg.plainText()) ?: return
             // 获取所有被 @ 的用户
@@ -149,7 +149,7 @@ class BanModule(
             saveState(banState)
         }
     }
-    private suspend fun processBanCommand(msg: GetFriendMsgHistoryEvent.SpecificMsg) {
+    private suspend fun processBanCommand(msg: MsgHistorySpecificMsg) {
         try {
             val parsed = banCommandParse.parseCommand(msg.plainText()) ?: return
             val (_, argument) = parsed
@@ -171,9 +171,9 @@ class BanModule(
                     is ID.LongValue -> target.value
                 }
 
-                // 权限检查：非管理员不能禁言他人
+                // 权限检查：非管理员不能禁言多个他人
                 if (mentionedUserIds.isNotEmpty() && mentionedUserIds.size != 1 && msg.sender.userId !in adminsId) {
-                    sendGroupMessage("❌ 你没有权限禁言使用禁言多用户功能", msg.realId)
+                    sendGroupMessage("❌ 你没有权限使用禁言多用户功能", msg.realId)
                     continue
                 }
 
@@ -201,7 +201,7 @@ class BanModule(
                     }
 
                     val selfDuration = durationSeconds * factorX
-                    if (Random.nextInt(100) < chance) {
+                    if (Random.nextInt(0,100) > chance) {
                         // 触发反禁自己
                         banUser(ID.long(msg.sender.userId), groupMessagePollingModule.targetGroupId, selfDuration)
                         sendGroupMessage(
@@ -262,6 +262,7 @@ class BanModule(
     override fun info(): String {
         return buildString {
             append("[$name] 指令禁言模块：\n")
+            append(" 管理员用户ID: ${adminsId}\n")
             append(" - 用户发送 ${banCommandParse.getCommands().joinToString("、")} 来禁言自己或指定其他用户（需管理员权限）。\n")
             append(" - 支持指定禁言分钟数或随机分钟数，范围 $minBanMinutes-$maxBanMinutes 分钟。\n")
             append(" - 支持对单个 @ 用户禁言，有概率反禁自己（骰子点数决定概率）。\n")

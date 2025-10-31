@@ -1,4 +1,17 @@
 package top.r3944realms.ltdmanager.module.common.filter.type
 
-class AdvancedCommonFilter {
+import top.r3944realms.ltdmanager.module.common.AdvancedCommandParser
+import top.r3944realms.ltdmanager.module.common.filter.MessageFilter
+import top.r3944realms.ltdmanager.napcat.data.MessageType
+import top.r3944realms.ltdmanager.napcat.data.msghistory.MsgHistorySpecificMsg
+
+class AdvancedCommonFilter(private val advancedCommandParser: AdvancedCommandParser): MessageFilter {
+    override suspend fun test(msg: MsgHistorySpecificMsg): Boolean {
+        return msg.message.any { seg ->
+            seg.type == MessageType.Text && seg.data.text?.let { text ->
+                advancedCommandParser.getRegisteredCommands().map { it.name }.any { name -> text.startsWith(name) }
+            } == true
+        }
+
+    }
 }

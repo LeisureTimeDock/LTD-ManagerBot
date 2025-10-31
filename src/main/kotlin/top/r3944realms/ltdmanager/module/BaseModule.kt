@@ -84,22 +84,46 @@ abstract class BaseModule(baseName : String = "BaseModule", idName : String = ""
      * 提供访问全局 NapCatClient 的快捷方式
      */
     protected val napCatClient get() = GlobalManager.napCatClient
+
     /**
      * 提供访问全局 blessingSkinClient 的快捷方式
      */
     protected val blessingSkinClient get() = GlobalManager.blessingSkinClient
+
     /**
      * 提供访问全局 mcSrvStatusClient 的快捷方式
      */
     protected val mcSrvStatusClient get() = GlobalManager.mcSrvStatusClient
+
     /**
      * 提供访问全局 加载模块 的快捷方式
      */
     protected val moduleMap get() = GlobalManager.moduleManager.getModules()
+
     /**
      * 获取数据库连接
      * 使用 try-with-resources 时会自动关闭
      */
     protected fun getConnection() = GlobalManager.getConnection()
+    /**
+     * 安全获取 NapCatClient，避免空指针异常
+     */
+    protected fun getNapCatClientOrNull() = try {
+        GlobalManager.napCatClient
+    } catch (e: Exception) {
+        LoggerUtil.logger.warn("获取NapCatClient失败", e)
+        null
+    }
 
+    /**
+     * 安全获取 NapCatClient，如果获取失败则抛出详细异常
+     */
+    protected fun getNapCatClientOrThrow(): Any {
+        val client = try {
+            GlobalManager.napCatClient
+        } catch (e: Exception) {
+            throw IllegalStateException("无法获取NapCatClient，请检查GlobalManager初始化状态", e)
+        }
+        return client ?: throw IllegalStateException("NapCatClient为null，请检查GlobalManager初始化")
+    }
 }

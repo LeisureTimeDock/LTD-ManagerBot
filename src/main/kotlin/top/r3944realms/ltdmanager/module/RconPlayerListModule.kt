@@ -17,7 +17,7 @@ import top.r3944realms.ltdmanager.napcat.NapCatClient
 import top.r3944realms.ltdmanager.napcat.data.ID
 import top.r3944realms.ltdmanager.napcat.data.MessageElement
 import top.r3944realms.ltdmanager.napcat.data.MessageType
-import top.r3944realms.ltdmanager.napcat.event.message.GetFriendMsgHistoryEvent
+import top.r3944realms.ltdmanager.napcat.data.msghistory.MsgHistorySpecificMsg
 import top.r3944realms.ltdmanager.napcat.request.message.SendForwardMsgRequest
 import top.r3944realms.ltdmanager.napcat.request.other.SendGroupMsgRequest
 import top.r3944realms.ltdmanager.utils.CmdUtil
@@ -110,7 +110,7 @@ class RconPlayerListModule(
         LoggerUtil.logger.info("[$name] 模块已卸载完成")
     }
 
-    private suspend fun handleMessages(messages: List<GetFriendMsgHistoryEvent.SpecificMsg>) {
+    private suspend fun handleMessages(messages: List<MsgHistorySpecificMsg>) {
         val filtered = triggerFilter.filter(messages)
 
         // RCON 模块只取最新的一条消息
@@ -124,7 +124,7 @@ class RconPlayerListModule(
             }
         }
     }
-    private suspend fun processTrigger(msg: GetFriendMsgHistoryEvent.SpecificMsg) {
+    private suspend fun processTrigger(msg: MsgHistorySpecificMsg) {
         LoggerUtil.logger.info("[$name] 执行 RCON 查询")
 
         val commands = listOf("forge tps", "list")

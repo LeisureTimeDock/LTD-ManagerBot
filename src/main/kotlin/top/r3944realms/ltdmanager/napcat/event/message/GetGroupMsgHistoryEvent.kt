@@ -3,6 +3,7 @@ package top.r3944realms.ltdmanager.napcat.event.message
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import top.r3944realms.ltdmanager.napcat.data.msghistory.MsgHistorySpecificMsg
 import top.r3944realms.ltdmanager.napcat.event.group.AbstractGroupEvent
 
 /**
@@ -22,9 +23,13 @@ data class GetGroupMsgHistoryEvent(
     @Transient
     val echo0: String? = null,
 
-    val data: GetFriendMsgHistoryEvent.Data
+    val data: Data
 ) : AbstractGroupEvent(status0, retcode0, message0, wording0, echo0) {
-    
+
+    @Serializable
+    data class Data (
+        val messages: List<MsgHistorySpecificMsg>
+    )
     override fun subtype(): String {
         return "get_group_msg_history"
     }

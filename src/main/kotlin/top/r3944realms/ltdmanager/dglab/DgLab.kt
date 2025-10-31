@@ -1,5 +1,6 @@
-package top.r3944realms.ltdmanager.dglab.manager
+package top.r3944realms.ltdmanager.dglab
 
+import com.r3944realms.dg_lab.api.manager.Status
 import com.r3944realms.dg_lab.api.operation.ClientOperation
 import com.r3944realms.dg_lab.api.operation.ServerOperation
 import com.r3944realms.dg_lab.api.websocket.message.role.WebSocketClientRole
@@ -11,25 +12,66 @@ import com.r3944realms.dg_lab.websocket.PowerBoxWSServer
 import com.r3944realms.dg_lab.websocket.sharedData.ClientPowerBoxSharedData
 import com.r3944realms.dg_lab.websocket.sharedData.ServerPowerBoxSharedData
 import top.r3944realms.ltdmanager.core.config.YamlConfigLoader
+import top.r3944realms.ltdmanager.dglab.manager.ClientManager
+import top.r3944realms.ltdmanager.dglab.manager.ServerManager
+import top.r3944realms.ltdmanager.dglab.model.game.Player
+import top.r3944realms.ltdmanager.dglab.model.game.PlayerManager
 import kotlin.io.path.Path
 
 /**
- * 全局DG_Lab单例管理器
+ * DG_Lab管理器
  */
-object DgLabManager {
+class DgLab {
     // 可空，延迟初始化
-    var serverManager: ServerManager? = null
-        private set
+    internal var serverManager: ServerManager? = null
+        get() = field
 
-    var clientManager: ClientManager? = null
-        private set
+    internal var clientManager: ClientManager? = null
+        get() = field
 
+    private var playerManager: PlayerManager? = null
+    companion object {
+        const val SERVER_ROLE_NAME = "Se-IC"
+    }
+    fun isSeverOnline(): Boolean = serverManager?.let { it.status == Status.RUNNING } ?: false
+
+    fun isClientOnline(id: String): Boolean = clientManager?.getClient(id)?.let { it.status == Status.RUNNING } ?: false
+
+    fun getPlayerManager(): PlayerManager = playerManager!!
+
+    fun close() {
+        serverManager?.stop()
+        clientManager?.stopAll()
+    }
+
+    fun initOrLoadPlayerManager(idNameMap: Map<Long, String>) {
+        playerManager = PlayerManager(1)
+        val idList = idNameMap.map { id -> id.key }
+        val existingIds = playerManager?.allPlayers()?.map { it.id }?.toSet() ?: emptySet()
+        val targetIds = idList.toSet()
+
+        // 要删除的
+        val toRemove = existingIds - targetIds
+        // 要新增的
+        val toAdd = targetIds - existingIds
+
+        // 删除
+        toRemove.forEach { id ->
+            playerManager?.removePlayer(id)
+        }
+
+        // 新增
+        toAdd.forEach { id ->
+            playerManager?.addPlayer(Player(id, idNameMap[id] as String,false))
+        }
+    }
 
     fun createServerManager(operation: ServerOperation): DGPBServerManager {
         val loadDgLabConfig = YamlConfigLoader.loadDgLabConfig()
+
         val boxWSServer = PowerBoxWSServer.Builder.getBuilder()
             .port(loadDgLabConfig.wsServer.localServerPort)
-            .role(WebSocketServerRole("Se-IC"))
+            .role(WebSocketServerRole(SERVER_ROLE_NAME))
             .operation(operation)
             .sharedData(ServerPowerBoxSharedData())
             .build()
@@ -66,7 +108,13 @@ object DgLabManager {
     fun removeClient(key: String) {
         clientManager?.removeClient(key)
     }
-
+    /**
+     * 获取 服务器管理类
+     */
+    @Throws(IllegalStateException::class)
+    fun getServer(): DGPBServerManager {
+        return serverManager?.getInstance() ?: throw IllegalStateException("Server is not initialized")
+    }
     /**
      * 获取 客户端管理类
      */
@@ -86,6 +134,7 @@ object DgLabManager {
                 .role(WebSocketClientRole("QQ-$key"))
                 .operation(operation)
                 .sharedData(ClientPowerBoxSharedData())
+                .useRoleMsgMode(true)
                 .build()
 
             if (loadDgLabConfig.wsServer.localServerSecure) {

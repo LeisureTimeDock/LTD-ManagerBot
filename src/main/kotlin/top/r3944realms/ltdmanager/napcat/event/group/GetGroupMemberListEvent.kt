@@ -3,7 +3,7 @@ package top.r3944realms.ltdmanager.napcat.event.group
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import kotlinx.serialization.json.JsonArray
+import top.r3944realms.ltdmanager.napcat.data.GroupMember
 
 /**
  * GetGroupMemberList事件
@@ -22,7 +22,7 @@ data class GetGroupMemberListEvent(
     @Transient
     val echo0: String? = null,
 
-    val data: JsonArray
+    val data: List<GroupMember>
 ) : AbstractGroupEvent(status0, retcode0, message0, wording0, echo0) {
     
     override fun subtype(): String {

@@ -18,8 +18,6 @@ data class GetGroupMemberListRequest(
     @SerialName("no_cache")
     val noCache: Boolean,
 
-    @SerialName("user_id")
-    val userId: ID
 ) : AbstractGroupRequest() {
     override fun toJSON(): String = Json.encodeToString(this)
 

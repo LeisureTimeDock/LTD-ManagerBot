@@ -24,6 +24,13 @@ repositories {
         maven {
             url = uri("https://maven.aliyun.com/repository/gradle-plugin")
         }
+        maven {
+            url = uri("https://libraries.minecraft.net/")
+        }
+        // 第三方 repo，比如 MohistMC 或 GlareMasters Pub
+        maven {
+            url = uri("https://repo.glaremasters.me/repository/public/")
+        }
     }
 //TODO: 0872d1c0-829c-e1d7-6782-89e45c8a6b76
     dependencies {
@@ -36,6 +43,10 @@ repositories {
         implementation("io.ktor:ktor-client-cio:2.3.3")
         implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.3") // 推荐使用kotlinx.serialization替代Gson
         implementation("io.ktor:ktor-client-content-negotiation:2.3.12")
+
+        implementation("com.squareup.okhttp3:okhttp:4.12.0")
+        // 如果需要日志拦截器（推荐用于调试）
+        implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
         // 数据库相关
         implementation("org.jetbrains.exposed:exposed-core:0.41.1")
@@ -70,6 +81,9 @@ repositories {
 
         //生成 二维码
         implementation("com.google.zxing:core:[3.5.3,)")
+
+        //命令解析
+        implementation("com.mojang:brigadier:1.2.9")
 
         // 测试
         testImplementation(kotlin("test"))

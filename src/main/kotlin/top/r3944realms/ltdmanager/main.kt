@@ -1,37 +1,50 @@
 package top.r3944realms.ltdmanager
 
 import top.r3944realms.ltdmanager.core.config.YamlConfigLoader
-import top.r3944realms.ltdmanager.module.McServerStatusModule
 import top.r3944realms.ltdmanager.module.*
 
 
 fun main() = GlobalManager.runBlockingMain {
-    val groupId:Long = 538751386
+    val commonGroupId:Long = 538751386
+    val whitelistGroupId:Long = 920719236
     val selfQQId = 3327379836
     val selfNickName = "闲趣老土豆"
     // 创建模块实例
     val groupModule = GroupRequestHandlerModule(
         moduleName = "WhiteListGroup",
         client = GlobalManager.napCatClient,
-        targetGroupId = groupId
+        targetGroupId = whitelistGroupId
     )
-    val groupMsgPollingModule = GroupMessagePollingModule(
-        moduleName = "WhiteListGroup",
-        targetGroupId = groupId,
+    val commonGroupMsgPollingModule = GroupMessagePollingModule(
+        moduleName = "CommonGroupMsgPolling",
+        targetGroupId = commonGroupId,
         pollIntervalMillis = 5_000L,
         msgHistoryCheck = 15
     )
-    val helpModule = HelpModule(
+    val whiteListGroupMsgPollingModule = GroupMessagePollingModule(
+        moduleName = "WhiteListGroup",
+        targetGroupId = whitelistGroupId,
+        pollIntervalMillis = 5_000L,
+        msgHistoryCheck = 15
+    )
+    val commonHelpModule = HelpModule(
+        moduleName = "CommonGroup",
+        keywords = listOf("help", "帮助"),
+        groupMessagePollingModule = commonGroupMsgPollingModule,
+        selfId = selfQQId,
+        selfNickName = selfNickName,
+    )
+    val whitelistHelpModule = HelpModule(
         moduleName = "WhiteListGroup",
         keywords = listOf("help", "帮助"),
-        groupMessagePollingModule = groupMsgPollingModule,
+        groupMessagePollingModule = whiteListGroupMsgPollingModule,
         selfId = selfQQId,
         selfNickName = selfNickName,
     )
     val toolConfig = YamlConfigLoader.loadToolConfig()
-    val rconModule = RconPlayerListModule(
+    val corconModule = RconPlayerListModule(
         moduleName = "WhiteListGroup",
-        groupMessagePollingModule = groupMsgPollingModule,
+        groupMessagePollingModule = commonGroupMsgPollingModule,
         rconTimeOut = 2_000L,
         cooldownMillis = 10_000L,
         selfId = selfQQId,
@@ -46,76 +59,106 @@ fun main() = GlobalManager.runBlockingMain {
             "列表","服务器状态", "TPS", "tps", "list", "List"
         )
     )
-    val mailConfig = YamlConfigLoader.loadMailConfig()
-    val mailModule = MailModule(
+    val rconModule = RconPlayerListModule(
         moduleName = "WhiteListGroup",
-        host = mailConfig.host.toString(),
-        authToken = mailConfig.decryptedPassword.toString(),
-        port = mailConfig.port!!,
-        senderEmailAddress = mailConfig.mailAddress!!,
-    )
-    val blessingSkinConfig = YamlConfigLoader.loadBlessingSkinServerConfig()
-    val invitationCodesModule = InvitationCodesModule(
-        moduleName = "WhiteListGroup",
-        groupMessagePollingModule = groupMsgPollingModule,
-        mailModule = mailModule,
-        apiToken = blessingSkinConfig.invitationApi?.decryptedToken!!,
+        groupMessagePollingModule = whiteListGroupMsgPollingModule,
+        rconTimeOut = 2_000L,
+        cooldownMillis = 10_000L,
         selfId = selfQQId,
+        selfNickName = selfNickName,
+        rconPath = toolConfig.rcon.mcRconToolPath.toString(),
+        rconConfigPath = toolConfig.rcon.mcRconToolConfigPath.toString(),
         keywords = setOf(
-            "申请皮肤站注册邀请码",
-            "申请土豆服务器注册邀请码",
-            "申请LTD邀请码",
-            "Apply for an invitation code"
+            //形容
+            "土豆", "马铃薯", "Potato", "potato", "POTATO",
+            "Potatoes", "potatoes", "POTATOES", "🥔",
+            //正经
+            "列表","服务器状态", "TPS", "tps", "list", "List"
         )
     )
-    val mcServerStatusModule = McServerStatusModule(
-        moduleName = "WhiteListGroup",
-        groupMessagePollingModule = groupMsgPollingModule,
+//    val mailConfig = YamlConfigLoader.loadMailConfig()
+//    val mailModule = MailModule(
+//        moduleName = "WhiteListGroup",
+//        host = mailConfig.host.toString(),
+//        authToken = mailConfig.decryptedPassword.toString(),
+//        port = mailConfig.port!!,
+//        senderEmailAddress = mailConfig.mailAddress!!,
+//    )
+//    val blessingSkinConfig = YamlConfigLoader.loadBlessingSkinServerConfig()
+//    val invitationCodesModule = InvitationCodesModule(
+//        moduleName = "WhiteListGroup",
+//        groupMessagePollingModule = commonGroupMsgPollingModule,
+//        mailModule = mailModule,
+//        apiToken = blessingSkinConfig.invitationApi?.decryptedToken!!,
+//        selfId = selfQQId,
+//        keywords = setOf(
+//            "申请皮肤站注册邀请码",
+//            "申请土豆服务器注册邀请码",
+//            "申请LTD邀请码",
+//            "Apply for an invitation code"
+//        )
+//    )
+    val commonMcServerStatusModule = McServerStatusModule(
+        moduleName = "CommonGroup",
+        groupMessagePollingModule = commonGroupMsgPollingModule,
         selfId = selfQQId,
         cooldownMillis = 20_000L,
         selfNickName = selfNickName,
-        commands = listOf("/m", "/mcs", "seek", "s"),
+        commands = listOf("/m", "/mcs", "seek", "s", "test"),
         presetServer = mapOf(
-            setOf("先行土豆", "先行", "pre", "Pre", "BF", "bf", "p", "P") to "n2.akiracloud.net:10599",
-            setOf("土豆", "老土豆", "七周目", "7" ,"ZZ", "zz", "Zz", "seven") to "main.mmccdd.top:11106",
+            setOf("老土豆", "七周目", "7" ,"ZZ", "zz", "Zz", "seven") to "main.mmccdd.top:11106",
+            setOf("土豆", "八周目", "8" ,"39", "eight") to "ac.r3944realms.top"
         )
     )
-    val banModule = BanModule(
+    val whitelistMcServerStatusModule = McServerStatusModule(
         moduleName = "WhiteListGroup",
-        groupMessagePollingModule = groupMsgPollingModule,
+        groupMessagePollingModule = whiteListGroupMsgPollingModule,
         selfId = selfQQId,
-        adminsId = listOf(1283411677),
-        muteCommandPrefixList = listOf("口球", "mute", "Mute", "禁言"),
-        unmuteCommandPrefixList = listOf("解禁", "unmute", "Unmute", "解除禁言"),
-        minBanMinutes = 1,
-        maxBanMinutes = 15,
+        cooldownMillis = 20_000L,
+        selfNickName = selfNickName,
+        commands = listOf("/m", "/mcs", "seek", "s", "test"),
+        presetServer = mapOf(
+            setOf("老土豆", "七周目", "7" ,"ZZ", "zz", "Zz", "seven") to "main.mmccdd.top:11106",
+            setOf("土豆", "八周目", "8" ,"39", "eight") to "ac.r3944realms.top"
+        )
     )
-//    val modGroupHandlerModule = ModGroupHandlerModule(
-//        moduleName = "ModGroup",
-//        targetGroupId = 339340846,
-//        answers = listOf("戏鸢", "一只戏鸢", "折戏鸢", "LostInLinearPast", "lostinlinearpast"),
-//        pollIntervalMillis = 15_000L,
-//    )
+    val dgLabModule = DGLabModule(
+        moduleName = "DG",
+        groupMessagePollingModule = commonGroupMsgPollingModule,
+        selfId = selfQQId,
+        adminIds = listOf(2561098830L),
+        commandHead = listOf("dglab")
+    )
 
     // 注册模块到全局模块管理器
     GlobalManager.moduleManager.registerModule(groupModule)
-    GlobalManager.moduleManager.registerModule(groupMsgPollingModule)
-    GlobalManager.moduleManager.registerModule(mcServerStatusModule)
+    GlobalManager.moduleManager.registerModule(commonGroupMsgPollingModule)
+    GlobalManager.moduleManager.registerModule(whiteListGroupMsgPollingModule)
+    GlobalManager.moduleManager.registerModule(commonMcServerStatusModule)
     GlobalManager.moduleManager.registerModule(rconModule)
-    GlobalManager.moduleManager.registerModule(mailModule)
-    GlobalManager.moduleManager.registerModule(invitationCodesModule)
-    GlobalManager.moduleManager.registerModule(helpModule)
-    GlobalManager.moduleManager.registerModule(banModule)
+    GlobalManager.moduleManager.registerModule(corconModule)
+    GlobalManager.moduleManager.registerModule(whitelistMcServerStatusModule)
+//    GlobalManager.moduleManager.registerModule(mailModule)
+//    GlobalManager.moduleManager.registerModule(invitationCodesModule)
+    GlobalManager.moduleManager.registerModule(whitelistHelpModule)
+    GlobalManager.moduleManager.registerModule(commonHelpModule)
+    GlobalManager.moduleManager.registerModule(dgLabModule)
+//    GlobalManager.moduleManager.registerModule(banModule)
 //    GlobalManager.moduleManager.registerModule(modGroupHandlerModule)
 
     // 加载模块
     GlobalManager.moduleManager.loadModule(groupModule.name)
-    GlobalManager.moduleManager.loadModule(groupMsgPollingModule.name)
-    GlobalManager.moduleManager.loadModule(mcServerStatusModule.name)
+    GlobalManager.moduleManager.loadModule(commonGroupMsgPollingModule.name)
+    GlobalManager.moduleManager.loadModule(whiteListGroupMsgPollingModule.name)
+    GlobalManager.moduleManager.loadModule(commonMcServerStatusModule.name)
+    GlobalManager.moduleManager.loadModule(corconModule.name)
     GlobalManager.moduleManager.loadModule(rconModule.name)
-    GlobalManager.moduleManager.loadModule(mailModule.name)
-    GlobalManager.moduleManager.loadModule(invitationCodesModule.name)
-    GlobalManager.moduleManager.loadModule(helpModule.name)
-    GlobalManager.moduleManager.loadModule(banModule.name)
+//    GlobalManager.moduleManager.loadModule(mailModule.name)
+//    GlobalManager.moduleManager.loadModule(invitationCodesModule.name)
+    GlobalManager.moduleManager.loadModule(commonHelpModule.name)
+    GlobalManager.moduleManager.loadModule(whitelistMcServerStatusModule.name)
+    GlobalManager.moduleManager.loadModule(whitelistHelpModule.name)
+    GlobalManager.moduleManager.loadModule(dgLabModule.name)
+//    GlobalManager.moduleManager.loadModule(banModule.name)
 //    GlobalManager.moduleManager.loadModule(modGroupHandlerModule.name)
 }

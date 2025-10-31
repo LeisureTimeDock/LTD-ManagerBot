@@ -85,7 +85,7 @@ class BlessingSkinClient private constructor() : AutoCloseable {
      */
     private suspend fun processQueueItem(item: BlessingSkinQueueItem<BlessingSkinResponse, FailedBlessingSkinResponse>) {
         semaphore.withPermit {
-            val (request, deferred, _, maxRetries, expectsResponse) = item
+            val (request, deferred, _, maxRetries, _) = item
             var attempt = 0
             var lastError: Exception? = null
 

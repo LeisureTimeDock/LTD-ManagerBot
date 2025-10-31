@@ -4,7 +4,39 @@ import com.r3944realms.dg_lab.api.message.data.PulseWave
 import com.r3944realms.dg_lab.api.message.data.PulseWaveList
 
 object DefaultPulseData {
+    /**
+     * 将频率转换为 Dg-Lab 格式
+     *
+     * @param frequency 频率值
+     * @return Dg-Lab 格式的数字
+     */
+    private fun convertFrequency(frequency: Int): Int {
+        return when {
+            frequency <= 10 -> 10
+            frequency <= 100 -> frequency
+            frequency <= 600 -> (frequency - 100) / 5 + 100
+            frequency <= 1000 -> (frequency - 600) / 10 + 200
+            else -> 10
+        }
+    }
 
+    /**
+     * 转换频率数组为 Dg-Lab 格式
+     */
+    private fun convertFrequencies(frequencies: IntArray): IntArray {
+        return IntArray(frequencies.size) { index ->
+            convertFrequency(frequencies[index])
+        }
+    }
+
+    /**
+     * 创建经过频率转换的波形段
+     */
+    private fun createWaveSegment(frequencies: IntArray, strengths: IntArray): PulseWave {
+        val convertedFreqs = convertFrequencies(frequencies)
+        return PulseWave.fromArrays(convertedFreqs, strengths)
+    }
+    
     fun allPulseWaveLists(): Map<String, PulseWaveList> {
         return mapOf(
             "呼吸" to Breath,
@@ -47,7 +79,7 @@ object DefaultPulseData {
 
         // 转成 PulseWave 并加入列表
         for (seg in segments) {
-            list.add(PulseWave.fromArrays(seg[0], seg[1]))
+            list.add(createWaveSegment(seg[0], seg[1]))
         }
 
         list
@@ -68,7 +100,7 @@ object DefaultPulseData {
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(84, 82, 80, 76)),
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(68, 68, 68, 68))
         )
-        segments.forEach { list.add(PulseWave.fromArrays(it[0], it[1])) }
+        segments.forEach { list.add(createWaveSegment(it[0], it[1])) }
         list
     }
 
@@ -85,7 +117,7 @@ object DefaultPulseData {
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(0, 0, 0, 1)),
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(2, 2, 2, 2))
         )
-        segments.forEach { list.add(PulseWave.fromArrays(it[0], it[1])) }
+        segments.forEach { list.add(createWaveSegment(it[0], it[1])) }
         list
     }
     val FastPinch: PulseWaveList by lazy {
@@ -96,7 +128,7 @@ object DefaultPulseData {
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(100, 100, 100, 100)),
             arrayOf(intArrayOf(0, 0, 0, 0), intArrayOf(0, 0, 0, 0))
         )
-        segments.forEach { list.add(PulseWave.fromArrays(it[0], it[1])) }
+        segments.forEach { list.add(createWaveSegment(it[0], it[1])) }
         list
     }
     val PinchGradual: PulseWaveList by lazy {
@@ -115,7 +147,7 @@ object DefaultPulseData {
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(100, 100, 100, 100)),
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(0, 0, 0, 0))
         )
-        segments.forEach { list.add(PulseWave.fromArrays(it[0], it[1])) }
+        segments.forEach { list.add(createWaveSegment(it[0], it[1])) }
         list
     }
 
@@ -140,7 +172,7 @@ object DefaultPulseData {
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(0, 0, 0, 0)),
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(0, 0, 0, 0))
         )
-        segments.forEach { list.add(PulseWave.fromArrays(it[0], it[1])) }
+        segments.forEach { list.add(createWaveSegment(it[0], it[1])) }
         list
     }
     val Compress: PulseWaveList by lazy {
@@ -169,7 +201,7 @@ object DefaultPulseData {
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(100, 100, 100, 100)),
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(100, 100, 100, 100))
         )
-        segments.forEach { list.add(PulseWave.fromArrays(it[0], it[1])) }
+        segments.forEach { list.add(createWaveSegment(it[0], it[1])) }
         list
     }
     val RhythmStep: PulseWaveList by lazy {
@@ -203,7 +235,7 @@ object DefaultPulseData {
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(0, 0, 0, 0)),
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(100, 100, 100, 100))
         )
-        segments.forEach { list.add(PulseWave.fromArrays(it[0], it[1])) }
+        segments.forEach { list.add(createWaveSegment(it[0], it[1])) }
         list
     }
 
@@ -216,7 +248,7 @@ object DefaultPulseData {
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(100, 100, 100, 100)),
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(0, 0, 0, 0))
         )
-        segments.forEach { list.add(PulseWave.fromArrays(it[0], it[1])) }
+        segments.forEach { list.add(createWaveSegment(it[0], it[1])) }
         list
     }
 
@@ -231,7 +263,7 @@ object DefaultPulseData {
             arrayOf(intArrayOf(0, 0, 0, 0), intArrayOf(0, 0, 0, 0)),
             arrayOf(intArrayOf(0, 0, 0, 0), intArrayOf(0, 0, 0, 0))
         )
-        segments.forEach { list.add(PulseWave.fromArrays(it[0], it[1])) }
+        segments.forEach { list.add(createWaveSegment(it[0], it[1])) }
         list
     }
     val WaveRipple: PulseWaveList by lazy {
@@ -246,7 +278,7 @@ object DefaultPulseData {
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(50, 50, 50, 50)),
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(0, 0, 0, 0))
         )
-        segments.forEach { list.add(PulseWave.fromArrays(it[0], it[1])) }
+        segments.forEach { list.add(createWaveSegment(it[0], it[1])) }
         list
     }
 
@@ -259,7 +291,7 @@ object DefaultPulseData {
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(80, 90, 100, 100)),
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(0, 0, 0, 0))
         )
-        segments.forEach { list.add(PulseWave.fromArrays(it[0], it[1])) }
+        segments.forEach { list.add(createWaveSegment(it[0], it[1])) }
         list
     }
 
@@ -273,7 +305,7 @@ object DefaultPulseData {
             arrayOf(intArrayOf(20, 20, 20, 20), intArrayOf(50, 50, 50, 50)),
             arrayOf(intArrayOf(15, 15, 15, 15), intArrayOf(0, 0, 0, 0))
         )
-        segments.forEach { list.add(PulseWave.fromArrays(it[0], it[1])) }
+        segments.forEach { list.add(createWaveSegment(it[0], it[1])) }
         list
     }
     val SignalLight: PulseWaveList by lazy {
@@ -285,7 +317,7 @@ object DefaultPulseData {
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(0, 0, 0, 0)),
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(100, 100, 100, 100))
         )
-        segments.forEach { list.add(PulseWave.fromArrays(it[0], it[1])) }
+        segments.forEach { list.add(createWaveSegment(it[0], it[1])) }
         list
     }
 
@@ -296,7 +328,7 @@ object DefaultPulseData {
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(0, 30, 60, 100)),
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(100, 70, 40, 0))
         )
-        segments.forEach { list.add(PulseWave.fromArrays(it[0], it[1])) }
+        segments.forEach { list.add(createWaveSegment(it[0], it[1])) }
         list
     }
 
@@ -307,7 +339,7 @@ object DefaultPulseData {
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(0, 50, 100, 100)),
             arrayOf(intArrayOf(10, 10, 10, 10), intArrayOf(100, 50, 0, 0))
         )
-        segments.forEach { list.add(PulseWave.fromArrays(it[0], it[1])) }
+        segments.forEach { list.add(createWaveSegment(it[0], it[1])) }
         list
     }
 }

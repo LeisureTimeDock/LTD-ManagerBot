@@ -4,7 +4,7 @@ package top.r394realms.ltdmanagertest.util
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.asRequestBody
-import top.r3944realms.ltdmanager.GlobalManager
+import okhttp3.logging.HttpLoggingInterceptor
 import top.r3944realms.ltdmanager.utils.LoggerUtil
 import java.io.File
 import java.io.IOException
@@ -42,6 +42,7 @@ object ImageUploader {
         val request = Request.Builder()
             .url("https://pic.xiaobuawa.top/api/1/upload")
             .header("X-API-Key", apiKey.trim()) // 重要：去除空格
+            .header("User-Agent", "OkHttp/4.12.0") // 添加 User-Agent
             .post(requestBody)
             .build()
 
@@ -82,6 +83,7 @@ object ImageUploader {
         val request = Request.Builder()
             .url("https://pic.xiaobuawa.top/api/1/upload")
             .header("X-API-Key", apiKey.trim())
+            .header("User-Agent", "OkHttp/4.12.0")
             .post(requestBody)
             .build()
 

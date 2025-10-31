@@ -17,7 +17,7 @@ import top.r3944realms.ltdmanager.napcat.NapCatClient
 import top.r3944realms.ltdmanager.napcat.data.ID
 import top.r3944realms.ltdmanager.napcat.data.MessageElement
 import top.r3944realms.ltdmanager.napcat.data.MessageType
-import top.r3944realms.ltdmanager.napcat.event.message.GetFriendMsgHistoryEvent
+import top.r3944realms.ltdmanager.napcat.data.msghistory.MsgHistorySpecificMsg
 import top.r3944realms.ltdmanager.napcat.request.message.SendForwardMsgRequest
 import top.r3944realms.ltdmanager.napcat.request.other.SendGroupMsgRequest
 import top.r3944realms.ltdmanager.utils.LoggerUtil
@@ -112,7 +112,7 @@ class McServerStatusModule(
         LoggerUtil.logger.info("[$name] 模块已卸载完成")
     }
 
-    private suspend fun handleMessages(messages: List<GetFriendMsgHistoryEvent.SpecificMsg>) {
+    private suspend fun handleMessages(messages: List<MsgHistorySpecificMsg>) {
         if (messages.isEmpty()) return
         val triggerMsgs = filterTriggerMessages(messages)
         if (triggerMsgs.isEmpty()) return
@@ -129,8 +129,8 @@ class McServerStatusModule(
     }
 
     private suspend fun filterTriggerMessages(
-        messages: List<GetFriendMsgHistoryEvent.SpecificMsg>
-    ): List<GetFriendMsgHistoryEvent.SpecificMsg> = triggerFilter.filter(messages)
+        messages: List<MsgHistorySpecificMsg>
+    ): List<MsgHistorySpecificMsg> = triggerFilter.filter(messages)
 
     private suspend fun sendFailedMessage(
         client: NapCatClient,
@@ -169,7 +169,7 @@ class McServerStatusModule(
 
 
 
-    private suspend fun processCommand(msg: GetFriendMsgHistoryEvent.SpecificMsg) {
+    private suspend fun processCommand(msg: MsgHistorySpecificMsg) {
         // 找出文本内容
         val text = msg.message
             .firstOrNull { it.type == MessageType.Text }
@@ -226,7 +226,7 @@ class McServerStatusModule(
     // ---------------- 转发消息封装 ----------------
     private suspend fun sendStatusForwardMessage(
         client: NapCatClient,
-        msg: GetFriendMsgHistoryEvent.SpecificMsg,
+        msg: MsgHistorySpecificMsg,
         address: String,
         status: McServerStatus,
         realId: Long,

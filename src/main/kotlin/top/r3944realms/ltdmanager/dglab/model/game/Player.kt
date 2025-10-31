@@ -1,8 +1,13 @@
 package top.r3944realms.ltdmanager.dglab.model.game
 
+import kotlinx.serialization.Serializable
+
 /**
- * 玩家类，目前仅包含一个 ID
+ * 玩家类
  */
+@Serializable
 data class Player(
-    val id: String
+    val id: Long,
+    var name: String,
+    var active: Boolean,
 )

@@ -57,4 +57,24 @@ object QRCodeUtil {
         }
         return image
     }
+    @Throws(IOException::class, WriterException::class)
+    fun generateQRCodeToFile(
+        text: String,
+        width: Int,
+        height: Int,
+        filePath: String
+    ) {
+        val hints: MutableMap<EncodeHintType, Any> = EnumMap(EncodeHintType::class.java)
+        hints[EncodeHintType.CHARACTER_SET] = CHARSET
+
+        // 生成二维码矩阵
+        val bitMatrix = MultiFormatWriter().encode(text, BarcodeFormat.QR_CODE, width, height, hints)
+
+        // 转成 BufferedImage
+        val image = toBufferedImage(bitMatrix)
+
+        // 保存到文件
+        val outputFile = java.io.File(filePath)
+        ImageIO.write(image, FORMAT, outputFile)
+    }
 }

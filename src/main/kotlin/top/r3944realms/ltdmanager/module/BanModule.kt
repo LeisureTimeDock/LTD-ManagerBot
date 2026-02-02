@@ -35,7 +35,7 @@ class BanModule(
     private val maxBanMinutes: Int = 15,
     private val factorX: Int = 2,         // 系数 x，禁言倍数
 
-) : BaseModule("BanModule", moduleName), PersistentState<BanModule.BanState> {
+) : BaseModule(Modules.BAN, moduleName), PersistentState<BanModule.BanState> {
 
     private val banCommandParse = CommandParser(muteCommandPrefixList)
     private val pardonCommandParse = CommandParser(unmuteCommandPrefixList)

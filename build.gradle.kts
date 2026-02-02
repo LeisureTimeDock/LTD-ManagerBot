@@ -31,6 +31,10 @@ repositories {
         maven {
             url = uri("https://repo.glaremasters.me/repository/public/")
         }
+        maven {
+            name = "LTD Maven"
+            url = uri("https://nexus.bot.leisuretimedock.top/repository/maven-public/")
+        }
     }
 //TODO: 0872d1c0-829c-e1d7-6782-89e45c8a6b76
     dependencies {
@@ -77,7 +81,7 @@ repositories {
         //DG_Lab 依赖库导入
         implementation("io.netty:netty-all:4.1.109.Final")
         implementation("com.google.code.gson:gson:2.10.1")
-        implementation(files("libs/DgLab-common-${k("dg_lab_version")}.jar"))
+        implementation("top.r3944realms.dg_lab:Common:${k("dg_lab_version")}")
 
         //生成 二维码
         implementation("com.google.zxing:core:[3.5.3,)")

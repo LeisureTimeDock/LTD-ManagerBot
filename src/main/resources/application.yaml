@@ -20,6 +20,8 @@ websocket:
   url: "wss://127.0.0.1:3002"
   # 格式为 ENC(XXX),若不是则会在加载完成配置后自动加密
   encrypted-token: "123123cc"
+mcsm:
+
 tools:
   rcon:
     mc-rcon-tool-path: "/path/to/rcon"

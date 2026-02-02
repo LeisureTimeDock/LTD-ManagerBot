@@ -3,7 +3,7 @@ package top.r3944realms.ltdmanager
 import top.r3944realms.ltdmanager.core.config.YamlConfigLoader
 import top.r3944realms.ltdmanager.module.*
 
-
+// DSL
 fun main() = GlobalManager.runBlockingMain {
     val commonGroupId:Long = 538751386
     val whitelistGroupId:Long = 920719236
@@ -43,7 +43,7 @@ fun main() = GlobalManager.runBlockingMain {
     )
     val toolConfig = YamlConfigLoader.loadToolConfig()
     val corconModule = RconPlayerListModule(
-        moduleName = "WhiteListGroup",
+        moduleName = "CommonGroup",
         groupMessagePollingModule = commonGroupMsgPollingModule,
         rconTimeOut = 2_000L,
         cooldownMillis = 10_000L,
@@ -98,30 +98,30 @@ fun main() = GlobalManager.runBlockingMain {
 //            "Apply for an invitation code"
 //        )
 //    )
-    val commonMcServerStatusModule = McServerStatusModule(
-        moduleName = "CommonGroup",
-        groupMessagePollingModule = commonGroupMsgPollingModule,
-        selfId = selfQQId,
-        cooldownMillis = 20_000L,
-        selfNickName = selfNickName,
-        commands = listOf("/m", "/mcs", "seek", "s", "test"),
-        presetServer = mapOf(
-            setOf("老土豆", "七周目", "7" ,"ZZ", "zz", "Zz", "seven") to "main.mmccdd.top:11106",
-            setOf("土豆", "八周目", "8" ,"39", "eight") to "ac.r3944realms.top"
-        )
-    )
-    val whitelistMcServerStatusModule = McServerStatusModule(
-        moduleName = "WhiteListGroup",
-        groupMessagePollingModule = whiteListGroupMsgPollingModule,
-        selfId = selfQQId,
-        cooldownMillis = 20_000L,
-        selfNickName = selfNickName,
-        commands = listOf("/m", "/mcs", "seek", "s", "test"),
-        presetServer = mapOf(
-            setOf("老土豆", "七周目", "7" ,"ZZ", "zz", "Zz", "seven") to "main.mmccdd.top:11106",
-            setOf("土豆", "八周目", "8" ,"39", "eight") to "ac.r3944realms.top"
-        )
-    )
+//    val commonMcServerStatusModule = McServerStatusModule(
+//        moduleName = "CommonGroup",
+//        groupMessagePollingModule = commonGroupMsgPollingModule,
+//        selfId = selfQQId,
+//        cooldownMillis = 20_000L,
+//        selfNickName = selfNickName,
+//        commands = listOf("/m", "/mcs", "seek", "s", "test"),
+//        presetServer = mapOf(
+//            setOf("老土豆", "七周目", "7" ,"ZZ", "zz", "Zz", "seven") to "main.mmccdd.top:11106",
+//            setOf("土豆", "八周目", "8" ,"39", "eight") to "ac.r3944realms.top"
+//        )
+//    )
+//    val whitelistMcServerStatusModule = McServerStatusModule(
+//        moduleName = "WhiteListGroup",
+//        groupMessagePollingModule = whiteListGroupMsgPollingModule,
+//        selfId = selfQQId,
+//        cooldownMillis = 20_000L,
+//        selfNickName = selfNickName,
+//        commands = listOf("/m", "/mcs", "seek", "s", "test"),
+//        presetServer = mapOf(
+//            setOf("老土豆", "七周目", "7" ,"ZZ", "zz", "Zz", "seven") to "main.mmccdd.top:11106",
+//            setOf("土豆", "八周目", "8" ,"39", "eight") to "ac.r3944realms.top"
+//        )
+//    )
     val dgLabModule = DGLabModule(
         moduleName = "DG",
         groupMessagePollingModule = commonGroupMsgPollingModule,
@@ -134,10 +134,10 @@ fun main() = GlobalManager.runBlockingMain {
     GlobalManager.moduleManager.registerModule(groupModule)
     GlobalManager.moduleManager.registerModule(commonGroupMsgPollingModule)
     GlobalManager.moduleManager.registerModule(whiteListGroupMsgPollingModule)
-    GlobalManager.moduleManager.registerModule(commonMcServerStatusModule)
+//    GlobalManager.moduleManager.registerModule(commonMcServerStatusModule)
     GlobalManager.moduleManager.registerModule(rconModule)
     GlobalManager.moduleManager.registerModule(corconModule)
-    GlobalManager.moduleManager.registerModule(whitelistMcServerStatusModule)
+//    GlobalManager.moduleManager.registerModule(whitelistMcServerStatusModule)
 //    GlobalManager.moduleManager.registerModule(mailModule)
 //    GlobalManager.moduleManager.registerModule(invitationCodesModule)
     GlobalManager.moduleManager.registerModule(whitelistHelpModule)
@@ -150,13 +150,13 @@ fun main() = GlobalManager.runBlockingMain {
     GlobalManager.moduleManager.loadModule(groupModule.name)
     GlobalManager.moduleManager.loadModule(commonGroupMsgPollingModule.name)
     GlobalManager.moduleManager.loadModule(whiteListGroupMsgPollingModule.name)
-    GlobalManager.moduleManager.loadModule(commonMcServerStatusModule.name)
+//    GlobalManager.moduleManager.loadModule(commonMcServerStatusModule.name)
     GlobalManager.moduleManager.loadModule(corconModule.name)
     GlobalManager.moduleManager.loadModule(rconModule.name)
 //    GlobalManager.moduleManager.loadModule(mailModule.name)
 //    GlobalManager.moduleManager.loadModule(invitationCodesModule.name)
     GlobalManager.moduleManager.loadModule(commonHelpModule.name)
-    GlobalManager.moduleManager.loadModule(whitelistMcServerStatusModule.name)
+//    GlobalManager.moduleManager.loadModule(whitelistMcServerStatusModule.name)
     GlobalManager.moduleManager.loadModule(whitelistHelpModule.name)
     GlobalManager.moduleManager.loadModule(dgLabModule.name)
 //    GlobalManager.moduleManager.loadModule(banModule.name)

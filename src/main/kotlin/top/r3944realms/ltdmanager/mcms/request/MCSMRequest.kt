@@ -1,14 +1,15 @@
-package top.r3944realms.ltdmanager.blessingskin.request
+package top.r3944realms.ltdmanager.mcms.request
 
 import io.ktor.http.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import top.r3944realms.ltdmanager.blessingskin.response.BlessingSkinResponse
-import top.r3944realms.ltdmanager.blessingskin.response.FailedBlessingSkinResponse
-import top.r3944realms.ltdmanager.blessingskin.response.ResponseResult
+import top.r3944realms.ltdmanager.mcms.response.FailedMCSMResponse
+import top.r3944realms.ltdmanager.mcms.response.MCSMResponse
+import top.r3944realms.ltdmanager.mcms.response.ResponseResult
+
 
 @Serializable
-abstract class BlessingSkinRequest<out T : BlessingSkinResponse, out F : FailedBlessingSkinResponse>(
+abstract class MCSMRequest<out T : MCSMResponse, out F : FailedMCSMResponse>(
     @Transient
     open val createTime: Long = System.currentTimeMillis()
 ) {

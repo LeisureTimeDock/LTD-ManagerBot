@@ -31,6 +31,7 @@ object YamlConfigLoader {
         config?.database?.encryptPassword()
         config?.websocket?.encryptToken()
         config?.http?.encryptToken()
+        config?.mcsm?.encryptApi()
         config?.mail?.encryptPassword()
         config?.tools?.rcon?.encryptPassword()
         config?.blessingSkinServer?.invitationApi?.encryptToken()
@@ -72,6 +73,7 @@ object YamlConfigLoader {
 
     fun loadDatabaseConfig(): DatabaseConfig = config.database
     fun loadCryptoConfig(): CryptoConfig = config.crypto
+    fun loadMcsmConfig(): McsmConfig = config.mcsm
     fun loadWebsocketConfig(): WebsocketConfig = config.websocket
     fun loadHttpConfig(): HttpConfig = config.http
     fun loadModeConfig(): ModeConfig = config.mode
@@ -88,6 +90,7 @@ object YamlConfigLoader {
         var http: HttpConfig = HttpConfig(),
         var tools: ToolConfig = ToolConfig(),
         var mail: MailConfig = MailConfig(),
+        var mcsm: McsmConfig = McsmConfig(),
         var blessingSkinServer: BlessingSkinServerConfig = BlessingSkinServerConfig(),
         var dgLab: DgLabConfig = DgLabConfig(),
         var imgTu: ImgTuConfig = ImgTuConfig(),

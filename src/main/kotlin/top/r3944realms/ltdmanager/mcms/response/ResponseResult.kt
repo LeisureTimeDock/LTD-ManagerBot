@@ -1,9 +1,9 @@
-package top.r3944realms.ltdmanager.blessingskin.response
+package top.r3944realms.ltdmanager.mcms.response
 
 // 响应结果封装
-sealed class ResponseResult<out T : BlessingSkinResponse, out F : FailedBlessingSkinResponse> {
-    data class Success<T : BlessingSkinResponse>(val response: T) : ResponseResult<T, Nothing>()
-    data class Failure<F : FailedBlessingSkinResponse>(val failure: F) : ResponseResult<Nothing, F>()
+sealed class ResponseResult<out T : MCSMResponse, out F : FailedMCSMResponse> {
+    data class Success<T : MCSMResponse>(val response: T) : ResponseResult<T, Nothing>()
+    data class Failure<F : FailedMCSMResponse>(val failure: F) : ResponseResult<Nothing, F>()
 
     /**
      * 检查是否成功

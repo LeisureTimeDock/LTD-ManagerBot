@@ -1,14 +1,29 @@
-package top.r3944realms.ltdmanager.blessingskin.response
+package top.r3944realms.ltdmanager.mcms.response
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlinx.serialization.json.JsonObject
 
 @Serializable
-abstract class FailedBlessingSkinResponse: BlessingSkinResponse() {
-    abstract fun failedMessage(): String
+open class FailedMCSMResponse(
+    @Transient
+    val status0: Status = Status.Ok,
+    val data: JsonObject? = null,
+    @Transient
+    val time0: Long = -1,
+): MCSMResponse(
+   status0, time0
+)  {
     @Serializable
-    class Default(@Transient val failedResult: String? = "未知错误") : FailedBlessingSkinResponse() {
-        override fun failedMessage(): String = failedResult!!
-
-    }
+    data class ExceptionFailedMCSMResponse(
+        @Transient
+        val status1: Status = Status.Ok,
+        val data0: String? = null,
+        @Transient
+        val time1: Long = -1,
+        @Transient
+        val result: String? = null,
+    ): FailedMCSMResponse(
+        status1, null, time1
+    )
 }

@@ -8,6 +8,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import top.r3944realms.ltdmanager.GlobalManager
+import top.r3944realms.ltdmanager.chevereto.response.FailedCheveretoResponse
+import top.r3944realms.ltdmanager.chevereto.response.v1.CheveretoUploadResponse
 import top.r3944realms.ltdmanager.core.config.YamlConfigLoader
 import top.r3944realms.ltdmanager.napcat.NapCatClient
 import top.r3944realms.ltdmanager.napcat.data.ID
@@ -104,7 +106,7 @@ class GameClientOperation(
 
             pattern.replace(originalUrl) { matchResult ->
                 // 保留原始 URL 中的路径部分（如果有的话）
-                val path = matchResult.groupValues[1] ?: ""
+                val path = matchResult.groupValues[1]
                 "$configUrl$path"
             }
         } catch (e: Exception) {
@@ -130,8 +132,7 @@ class GameClientOperation(
                 albumId = "BFx",
                 expiration = "PT5M"
             )
-            if (response.image?.url != null) {
-                // 发送图床 URL 给玩家
+            if (response is CheveretoUploadResponse){
                 napCatClient.sendUnit(
                     SendPrivateMsgRequest(
                         listOf(
@@ -141,8 +142,15 @@ class GameClientOperation(
                         ID.long(playerId)
                     )
                 )
-            } else {
-                LoggerUtil.logger.error("上传二维码返回 JSON 未包含 URL")
+            } else if (response is FailedCheveretoResponse.Default){
+                napCatClient.sendUnit(
+                    SendPrivateMsgRequest(
+                        listOf(
+                            MessageElement.text("无法上传图片，请联系管理员:${response.httpStatusCode} , ${response.failedMessage}"),
+                        ),
+                        ID.long(playerId)
+                    )
+                )
             }
             // 启动 60 秒倒计时任务
             bindingTimeoutJob = launch {

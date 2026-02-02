@@ -1,4 +1,4 @@
-package top.r3944realms.ltdmanager.blessingskin
+package top.r3944realms.ltdmanager.mcms
 
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -11,17 +11,17 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
-import top.r3944realms.ltdmanager.blessingskin.request.BlessingSkinRequest
-import top.r3944realms.ltdmanager.blessingskin.response.BlessingSkinResponse
-import top.r3944realms.ltdmanager.blessingskin.response.FailedBlessingSkinResponse
-import top.r3944realms.ltdmanager.blessingskin.response.ResponseResult
 import top.r3944realms.ltdmanager.core.config.YamlConfigLoader
+import top.r3944realms.ltdmanager.mcms.request.MCSMRequest
+import top.r3944realms.ltdmanager.mcms.response.FailedMCSMResponse
+import top.r3944realms.ltdmanager.mcms.response.MCSMResponse
+import top.r3944realms.ltdmanager.mcms.response.ResponseResult
 import top.r3944realms.ltdmanager.utils.Environment
 import top.r3944realms.ltdmanager.utils.LoggerUtil
 import java.net.URLEncoder
 import java.util.*
 
-class BlessingSkinClient private constructor() : AutoCloseable {
+class MCSMClient private constructor() : AutoCloseable {
     private val client = HttpClient(CIO) {
         expectSuccess = false
 
@@ -40,7 +40,7 @@ class BlessingSkinClient private constructor() : AutoCloseable {
     // 限流控制
     private val semaphore = Semaphore(5)
     private val requestMutex = Mutex()
-    private val requestQueue = PriorityQueue<BlessingSkinQueueItem<BlessingSkinResponse, FailedBlessingSkinResponse>>(compareBy { it.priority })
+    private val requestQueue = PriorityQueue<MCSMSkinQueueItem<MCSMResponse, FailedMCSMResponse>>(compareBy { it.priority })
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     init {
@@ -50,14 +50,14 @@ class BlessingSkinClient private constructor() : AutoCloseable {
     /**
      * 提交请求
      */
-    suspend fun <T : BlessingSkinResponse, F : FailedBlessingSkinResponse> submitRequest(
-        request: BlessingSkinRequest<T, F>,
+    suspend fun <T : MCSMResponse, F : FailedMCSMResponse> submitRequest(
+        request: MCSMRequest<T, F>,
         priority: Int = 5,
         maxRetries: Int = 3
     ): ResponseResult<T, F> {
         val deferred = CompletableDeferred<ResponseResult<T, F>>()
         requestMutex.withLock {
-            requestQueue.add(BlessingSkinQueueItem(request, deferred, priority, maxRetries, true))
+            requestQueue.add(MCSMSkinQueueItem(request, deferred, priority, maxRetries, true))
         }
         return deferred.await()
     }
@@ -83,7 +83,7 @@ class BlessingSkinClient private constructor() : AutoCloseable {
     /**
      * 处理队列项
      */
-    private suspend fun processQueueItem(item: BlessingSkinQueueItem<BlessingSkinResponse, FailedBlessingSkinResponse>) {
+    private suspend fun processQueueItem(item: MCSMSkinQueueItem<MCSMResponse, FailedMCSMResponse>) {
         semaphore.withPermit {
             val (request, deferred, _, maxRetries, _) = item
             var attempt = 0
@@ -130,7 +130,7 @@ class BlessingSkinClient private constructor() : AutoCloseable {
                     val result = request.getResponse(responseText, response.status)
 
                     @Suppress("UNCHECKED_CAST")
-                    (deferred as CompletableDeferred<ResponseResult<BlessingSkinResponse, FailedBlessingSkinResponse>>).complete(result)
+                    (deferred as CompletableDeferred<ResponseResult<MCSMResponse, FailedMCSMResponse>>).complete(result)
 
                     return
 
@@ -142,15 +142,15 @@ class BlessingSkinClient private constructor() : AutoCloseable {
                         break
                     }
 
-                    LoggerUtil.logger.warn("BlessingSkin请求失败 (尝试 $attempt/$maxRetries): ${e.message}")
+                    LoggerUtil.logger.warn("MCSM请求失败 (尝试 $attempt/$maxRetries): ${e.message}")
                     delay((attempt * 1000L)) // 指数退避
                 }
             }
 
             // 所有重试都失败或不应重试
-            val errorResponse = createFailureResponse(lastError, request)
+            val errorResponse = createFailureResponse(lastError)
             @Suppress("UNCHECKED_CAST")
-            (deferred as CompletableDeferred<ResponseResult<BlessingSkinResponse, FailedBlessingSkinResponse>>).complete(
+            (deferred as CompletableDeferred<ResponseResult<MCSMResponse, FailedMCSMResponse>>).complete(
                 ResponseResult.Failure(errorResponse)
             )
         }
@@ -159,7 +159,7 @@ class BlessingSkinClient private constructor() : AutoCloseable {
     /**
      * 构建完整的URL，包含查询参数
      */
-    private fun buildFullUrlWithQueryParams(request: BlessingSkinRequest<*, *>): String {
+    private fun buildFullUrlWithQueryParams(request: MCSMRequest<*, *>): String {
         val baseUrl = blessingSkinServerConfig.url?.removeSuffix("/")
         val path = request.path().removePrefix("/")
 
@@ -191,11 +191,10 @@ class BlessingSkinClient private constructor() : AutoCloseable {
      * 创建失败响应
      */
     private fun createFailureResponse(
-        exception: Exception?,
-        request: BlessingSkinRequest<*, *>
-    ): FailedBlessingSkinResponse {
-        return FailedBlessingSkinResponse.Default(
-            failedResult = exception?.message ?: "未知错误",
+        exception: Exception?
+    ): FailedMCSMResponse {
+        return FailedMCSMResponse.ExceptionFailedMCSMResponse(
+             result = exception?.message ?: "未知错误",
         )
     }
 
@@ -207,6 +206,6 @@ class BlessingSkinClient private constructor() : AutoCloseable {
     }
 
     companion object {
-        fun create(): BlessingSkinClient = BlessingSkinClient()
+        fun create(): MCSMClient = MCSMClient()
     }
 }

@@ -4,9 +4,10 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import top.r3944realms.ltdmanager.blessingskin.data.InvitationCode
 import top.r3944realms.ltdmanager.blessingskin.request.invitecode.GenerateInvitationCodeRequest
-import top.r3944realms.ltdmanager.blessingskin.response.ResponseResult
 import top.r3944realms.ltdmanager.blessingskin.response.invitecode.InvitationCodeGenerationResponse
+import top.r3944realms.ltdmanager.core.client.response.ResponseResult
 import top.r3944realms.ltdmanager.core.mail.mail
 import top.r3944realms.ltdmanager.module.common.cooldown.CooldownManager
 import top.r3944realms.ltdmanager.module.common.cooldown.CooldownScope
@@ -77,7 +78,7 @@ class InvitationCodesModule(
     selfId: Long,
     private val cooldownMillis: Long = 120_000,
     private val keywords: Set<String> = setOf("申请邀请码")
-) : BaseModule("InvitationCodesModule", moduleName), PersistentState<InvitationCodesModule.LastTriggerMapState> {
+) : BaseModule(Modules.INVITATION_CODE, moduleName), PersistentState<InvitationCodesModule.LastTriggerMapState> {
 
     private var scope: CoroutineScope? = null
     private val stateFile: File = getStateFileInternal("invitation_codes_quarry_state.json", name)
@@ -430,23 +431,33 @@ class InvitationCodesModule(
     /**
      * 1. 创建邀请码
      */
-    private suspend fun createInvitationCodes(amount: Int): List<InvitationCodeGenerationResponse.InvitationCode>? {
+    private suspend fun createInvitationCodes(amount: Int): List<InvitationCode>? {
         return try {
             val response = blessingSkinClient.submitRequest(
                 GenerateInvitationCodeRequest(amount = amount, token = apiToken)
             )
+            response
+                .onFailure {
 
+            }
+                .onSuccess {
+
+            }
             when (response) {
                 is ResponseResult.Success -> {
-                    if (response.response.success) {
-                        response.response.data
+                    if (response.response is InvitationCodeGenerationResponse) {
+                        if (response.response.success) {
+                            response.response.data
+                        } else
+                            LoggerUtil.logger.warn("[$name] API返回失败: ${response.response.message}")
+                        null
                     } else {
-                        LoggerUtil.logger.warn("[$name] API返回失败: ${response.response.message}")
+                        LoggerUtil.logger.warn("[$name] 返回非预期对象类型: ${response.response.javaClass}")
                         null
                     }
                 }
                 is ResponseResult.Failure -> {
-                    LoggerUtil.logger.warn("[$name] 创建邀请码失败: ${response.failure.failedResult}")
+                    LoggerUtil.logger.warn("[$name] 创建邀请码失败: ${response.failure.failedMessage}")
                     null
                 }
             }
@@ -460,7 +471,7 @@ class InvitationCodesModule(
      * 2. 验证数量匹配
      */
     private fun validateCodeCountMatch(
-        invitationCodes: List<InvitationCodeGenerationResponse.InvitationCode>?,
+        invitationCodes: List<InvitationCode>?,
         needNewTokenIdAndMsgPairs: List<Pair<Long, MsgHistorySpecificMsg>>
     ) {
         if (invitationCodes == null) {

@@ -35,7 +35,7 @@ class RconPlayerListModule(
     private val rconPath: String,
     private val rconConfigPath: String,
     private val keywords: Set<String> = setOf("查看玩家列表", "玩家列表", "在线玩家")
-) : BaseModule("RconPlayerListModule", moduleName), PersistentState<LastTriggerState> {
+) : BaseModule(Modules.RCON_PLAYER_LIST, moduleName), PersistentState<LastTriggerState> {
     private val cooldownManager by lazy {
         CooldownManager(
             cooldownMillis = cooldownMillis,

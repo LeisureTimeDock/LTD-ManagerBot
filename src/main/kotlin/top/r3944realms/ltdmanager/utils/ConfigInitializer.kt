@@ -13,7 +13,7 @@ object ConfigInitializer {
      * @param fileName YAML 文件名，如 application.yml
      * @param configDir 配置目录，如 config
      */
-    fun initConfig(fileName: String = "application.yml", configDir: String = "config") {
+    fun initConfig(fileName: String = "application.yml", configDir: String = "config", shouldExit: Boolean = true) {
         val dirPath = Paths.get(configDir)
         if (!Files.exists(dirPath)) {
             Files.createDirectories(dirPath)
@@ -28,8 +28,10 @@ object ConfigInitializer {
             if (resourceStream != null) {
                 Files.copy(resourceStream, filePath, StandardCopyOption.REPLACE_EXISTING)
                 LoggerUtil.logger.info("已生成默认配置文件: $filePath")
-                LoggerUtil.logger.info("第一次启动，请修改配置后再启动")
-                exitProcess(-1);
+                if (shouldExit) {
+                    LoggerUtil.logger.info("第一次启动，请修改配置后再启动")
+                    exitProcess(-1);
+                }
             } else throw Error("Jar内部资源文件缺失")
 
         } else {

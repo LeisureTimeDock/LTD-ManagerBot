@@ -8,7 +8,7 @@ class StateModule(
     moduleName: String,
     private val onlineName: String,
     private val offlineName: String,
-): BaseModule("StateModule", moduleName) {
+): BaseModule(Modules.STATE, moduleName) {
     private var scope: CoroutineScope? = null
     override fun onLoad() {
         scope = CoroutineScope(Dispatchers.IO + SupervisorJob())

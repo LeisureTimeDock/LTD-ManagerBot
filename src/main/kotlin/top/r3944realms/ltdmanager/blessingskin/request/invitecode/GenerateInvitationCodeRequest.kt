@@ -6,8 +6,8 @@ import kotlinx.serialization.Transient
 import top.r3944realms.ltdmanager.blessingskin.request.BlessingSkinRequest
 import top.r3944realms.ltdmanager.blessingskin.response.BlessingSkinResponse
 import top.r3944realms.ltdmanager.blessingskin.response.FailedBlessingSkinResponse
-import top.r3944realms.ltdmanager.blessingskin.response.ResponseResult
 import top.r3944realms.ltdmanager.blessingskin.response.invitecode.InvitationCodeGenerationResponse
+import top.r3944realms.ltdmanager.core.client.response.ResponseResult
 import top.r3944realms.ltdmanager.core.config.YamlConfigLoader
 import java.util.*
 
@@ -17,9 +17,7 @@ class GenerateInvitationCodeRequest(
     val token: String? = null,
     @Transient
     val amount: Int? = 1,
-    @Transient
-    override val createTime: Long = System.currentTimeMillis()
-) : BlessingSkinRequest<InvitationCodeGenerationResponse, FailedBlessingSkinResponse.Default>() {
+) : BlessingSkinRequest() {
 
     override fun toJSON(): String {
         // 对于GET请求，参数在URL中，body可以为空
@@ -66,7 +64,7 @@ class GenerateInvitationCodeRequest(
         } catch (e: Exception) {
             ResponseResult.Failure(
                 FailedBlessingSkinResponse.Default(
-                    failedResult = "解析响应失败: ${e.message}"
+                    failedMessage = "解析响应失败: ${e.message}"
                 )
             )
         }

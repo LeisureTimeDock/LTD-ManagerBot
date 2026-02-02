@@ -36,7 +36,7 @@ class McServerStatusModule(
         setOf("hp", "hypixel") to "mc.hypixel.net",
         setOf("pm", "mineplex") to "play.mineplex.com"
     )
-) : BaseModule("McServerStatusModule", moduleName), PersistentState<McServerStatusModule.CooldownState> {
+) : BaseModule(Modules.MC_SERVER_STATUS, moduleName), PersistentState<McServerStatusModule.CooldownState> {
     private val stateFile:File = getStateFileInternal("mc_server_status_state.json", name)
     private val stateBackupFile:File = getStateFileInternal("mc_server_status_state.json.bak", name)
     private val commandParser: CommandParser = CommandParser(commands)

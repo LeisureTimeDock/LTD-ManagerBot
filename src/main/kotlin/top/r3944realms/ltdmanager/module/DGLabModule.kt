@@ -49,7 +49,7 @@ class DGLabModule(
     val adminIds: List<Long> = listOf(),
     val maxClientNumber: Int = 10,
     val commandHead: List<String> = listOf("dglab"),
-) : BaseModule("DGLabModule", moduleName), PersistentState<DGLabModule.DgLabState> {
+) : BaseModule(Modules.DG_LAB, moduleName), PersistentState<DGLabModule.DgLabState> {
 
     var dgLabManager: DgLab? = null
     private var scope: CoroutineScope? = null

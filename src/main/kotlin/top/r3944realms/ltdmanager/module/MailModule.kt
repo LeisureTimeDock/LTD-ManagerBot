@@ -19,7 +19,7 @@ class MailModule(
     private val enableAuth: Boolean = true,
     private val enableTLS: Boolean = true,
     private val intervalMillis: Long = 2000L // 每封邮件之间的间隔（默认 2s）
-) : BaseModule("MailModule", moduleName) {
+) : BaseModule(Modules.MAIL, moduleName) {
 
     private lateinit var session: Session
     private val queue = LinkedBlockingQueue<Mail>()  // 邮件队列

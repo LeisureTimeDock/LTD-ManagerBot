@@ -7,14 +7,15 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import top.r3944realms.ltdmanager.blessingskin.response.invitecode.InvitationCodeGenerationResponse
+import top.r3944realms.ltdmanager.core.client.response.IResponse
 
 @Serializable
 abstract class BlessingSkinResponse (
     @Transient
-    open val httpStatusCode: HttpStatusCode = HttpStatusCode.OK,
+    override val httpStatusCode: HttpStatusCode = HttpStatusCode.OK,
     @Transient
-    open val createTime: Long = System.currentTimeMillis()
-) {
+    override val createTime: Long = System.currentTimeMillis()
+) : IResponse {
     companion object {
         // 通用的反序列化方法
         inline fun <reified T : BlessingSkinResponse> decode(jsonString: String): T {

@@ -31,7 +31,7 @@ class ModGroupHandlerModule(
     private val targetGroupId: Long,
     private val answers: List<String> = listOf("正确答案"),
     private val pollIntervalMillis: Long = 30_000L
-) : BaseModule("ModGroupHandlerModule", moduleName), PersistentState<ModGroupHandlerModule.RejectRecords> {
+) : BaseModule(Modules.MOD_GROUP_HANDLER, moduleName), PersistentState<ModGroupHandlerModule.RejectRecords> {
 
     private var scope: CoroutineScope? = null
     private val stateFile: File = getStateFileInternal("reject_records.json", name)

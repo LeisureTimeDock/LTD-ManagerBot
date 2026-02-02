@@ -4,13 +4,14 @@ import kotlinx.coroutines.CompletableDeferred
 import top.r3944realms.ltdmanager.blessingskin.request.BlessingSkinRequest
 import top.r3944realms.ltdmanager.blessingskin.response.BlessingSkinResponse
 import top.r3944realms.ltdmanager.blessingskin.response.FailedBlessingSkinResponse
+import top.r3944realms.ltdmanager.core.client.QueueItem
 
-data class BlessingSkinQueueItem<out T:BlessingSkinResponse,out F:FailedBlessingSkinResponse>(
-    val request: BlessingSkinRequest<T,F>,
-    val deferred: CompletableDeferred<*>,
-    var retries: Int,
-    val priority: Int,
-    val expectsResponse: Boolean // true 表示返回 BlessingSkinResponse, false 表示 Unit
-) : Comparable<BlessingSkinQueueItem<@UnsafeVariance T, @UnsafeVariance F>> {
-    override fun compareTo(other: BlessingSkinQueueItem<@UnsafeVariance T, @UnsafeVariance F>): Int = priority.compareTo(other.priority)
-}
+data class BlessingSkinQueueItem (
+    val request0: BlessingSkinRequest,
+    val deferred0: CompletableDeferred<*>,
+    val priority0: Int,
+    var retries0: Int,
+    val expectsResponse0: Boolean
+) : QueueItem<BlessingSkinRequest, BlessingSkinResponse, FailedBlessingSkinResponse> (
+    request0, deferred0, retries0, priority0, expectsResponse0
+)

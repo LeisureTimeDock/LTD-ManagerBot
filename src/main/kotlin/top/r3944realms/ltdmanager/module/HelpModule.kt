@@ -33,7 +33,7 @@ class HelpModule(
     private val selfNickName: String,
     private val keywords: List<String> = listOf("help", "帮助"),
     private val cooldownMillis: Long = 30_000L
-) : BaseModule("HelpModule", moduleName), PersistentState<HelpModule.HelpState> {
+) : BaseModule(Modules.HELP, moduleName), PersistentState<HelpModule.HelpState> {
 
     // 命令解析器
     private val commandParser = CommandParser(keywords)

@@ -15,7 +15,7 @@ class GroupRequestHandlerModule(
     private val client: NapCatClient,
     private val targetGroupId: Long,
     private val pollIntervalMillis: Long = 30_000L,
-) : BaseModule("GroupRequestHandlerModule", moduleName) {
+) : BaseModule(Modules.GROUP_REQUEST_HANDLER, moduleName) {
 
     private var scope: CoroutineScope? = null
 

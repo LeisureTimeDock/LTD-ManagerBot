@@ -15,7 +15,7 @@ class GroupMessagePollingModule(
     val targetGroupId: Long,
     private val pollIntervalMillis: Long = 5_000L,
     private val msgHistoryCheck: Int = 15,
-) : BaseModule("MessagePollingModule", moduleName) {
+) : BaseModule(Modules.GROUP_MESSAGE_POLLING, moduleName) {
     private var scope: CoroutineScope? = null
 
     // 用 Flow 存消息，其他模块可以订阅

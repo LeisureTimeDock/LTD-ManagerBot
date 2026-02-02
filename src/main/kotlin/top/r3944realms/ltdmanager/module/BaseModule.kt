@@ -1,6 +1,7 @@
 package top.r3944realms.ltdmanager.module
 
 import kotlinx.coroutines.CompletableDeferred
+import org.intellij.lang.annotations.MagicConstant
 import top.r3944realms.ltdmanager.GlobalManager
 import top.r3944realms.ltdmanager.utils.LoggerUtil
 import kotlin.coroutines.cancellation.CancellationException

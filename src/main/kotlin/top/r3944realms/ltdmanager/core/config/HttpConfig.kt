@@ -36,7 +36,7 @@ data class HttpConfig(
         try {
             encryptedToken = "ENC(${CryptoUtil.encrypt(encryptedToken!!)})"
             YamlUpdater.updateYaml(
-                YamlConfigLoader.configFilePath.toString(),
+                YamlConfigLoader.appConfigFilePath.toString(),
                 "http.encrypted-token",
                 this.encryptedToken!!
             )

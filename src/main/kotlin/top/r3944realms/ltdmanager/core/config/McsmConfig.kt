@@ -30,7 +30,7 @@ data class McsmConfig(
         try {
             encryptedApiKey = "ENC(${CryptoUtil.encrypt(encryptedApiKey!!)})"
             YamlUpdater.updateYaml(
-                YamlConfigLoader.configFilePath.toString(),
+                YamlConfigLoader.appConfigFilePath.toString(),
                 "mcsm.encrypted-api-key",
                 this.encryptedApiKey!!
             )

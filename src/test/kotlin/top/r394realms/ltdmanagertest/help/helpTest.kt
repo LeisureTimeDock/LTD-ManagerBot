@@ -29,11 +29,11 @@ fun main() = GlobalManager.runBlockingMain {
         adminIds = listOf(2561098830L),
         commandHead = listOf("dglab")
     )
-    GlobalManager.moduleManager.registerModule(groupMsgPollingModule)
-    GlobalManager.moduleManager.registerModule(helpModule)
-    GlobalManager.moduleManager.registerModule(dgLabModule)
+    GlobalManager.moduleManager.register(groupMsgPollingModule)
+    GlobalManager.moduleManager.register(helpModule)
+    GlobalManager.moduleManager.register(dgLabModule)
 
-    GlobalManager.moduleManager.loadModule(groupMsgPollingModule.name)
-    GlobalManager.moduleManager.loadModule(helpModule.name)
-    GlobalManager.moduleManager.loadModule(dgLabModule.name)
+    GlobalManager.moduleManager.load(groupMsgPollingModule.name)
+    GlobalManager.moduleManager.load(helpModule.name)
+    GlobalManager.moduleManager.load(dgLabModule.name)
 }

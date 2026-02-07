@@ -36,7 +36,7 @@ data class ImgTuConfig(
         try {
             encryptedPassword = "ENC(${CryptoUtil.encrypt(encryptedPassword!!)})"
             YamlUpdater.updateYaml(
-                YamlConfigLoader.configFilePath.toString(),
+                YamlConfigLoader.appConfigFilePath.toString(),
                 "img-tu.encrypted-password",
                 this.encryptedPassword!!
             )

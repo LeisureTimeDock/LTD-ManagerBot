@@ -36,7 +36,7 @@ data class WebsocketConfig(
         try {
             encryptedToken = "ENC(${CryptoUtil.encrypt(encryptedToken!!)})"
             YamlUpdater.updateYaml(
-                YamlConfigLoader.configFilePath.toString(),
+                YamlConfigLoader.appConfigFilePath.toString(),
                 "websocket.encrypted-token",
                 this.encryptedToken!!
             )

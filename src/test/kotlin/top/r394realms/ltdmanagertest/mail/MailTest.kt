@@ -22,9 +22,9 @@ fun main() = GlobalManager.runBlockingMain {
         }
     }
     if (mailModule == null) throw IllegalStateException("Lost Required Argument")
-    GlobalManager.moduleManager.registerModule(mailModule)
+    GlobalManager.moduleManager.register(mailModule)
 
-    GlobalManager.moduleManager.loadModule(mailModule.name)
+    GlobalManager.moduleManager.load(mailModule.name)
     val template = object {}.javaClass.classLoader
         .getResource("mail-body.html")?: throw IllegalArgumentException("模板文件未找到")
     val expireHours = 24 // 有效期 24 小时

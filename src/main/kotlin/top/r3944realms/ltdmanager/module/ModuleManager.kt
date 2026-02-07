@@ -1,18 +1,43 @@
 package top.r3944realms.ltdmanager.module
 
+import top.r3944realms.ltdmanager.core.config.YamlConfigLoader
 import top.r3944realms.ltdmanager.utils.LoggerUtil
+import java.util.*
 
 class ModuleManager {
-
     private val modules = mutableMapOf<String, BaseModule>()
-
+    private var hasLoaded = false
     fun getModules(): Map<String, BaseModule> {
         return (modules).toMap()
+    }
+    fun getModule(name: String): BaseModule? {
+        return modules[name]
+    }
+    fun loadConfig() {
+        if (!hasLoaded) {
+            hasLoaded = true
+            val moduleConfig = YamlConfigLoader.loadModuleConfig()
+            moduleConfig.modules.let {
+                val enableBaseModules = LinkedList<BaseModule>()
+                if (it != null) {
+                    for (mod in it) {
+                        val module = ModuleFactory.createModule(mod)
+                        register(module)
+                        if (mod.enabled) {
+                            enableBaseModules.add(module)
+                        }
+                    }
+                }
+                for (module in enableBaseModules) {
+                    load(module.name)
+                }
+            }
+        }
     }
     /**
      * 注册模块到管理器
      */
-    fun registerModule(module: BaseModule) {
+    fun register(module: BaseModule) {
         if (modules.containsKey(module.name)) {
             LoggerUtil.logger.warn("模块已注册: ${module.name}")
             return
@@ -23,16 +48,16 @@ class ModuleManager {
     /**
      * 注册多模块到管理器
      */
-    fun registerModules(moduleList: List<BaseModule>) {
+    fun register(moduleList: List<BaseModule>) {
         for (module in moduleList) {
-            registerModule(module)
+            register(module)
         }
     }
 
     /**
      * 加载指定模块
      */
-    fun loadModule(name: String) {
+    fun load(name: String) {
         val module = modules[name]
         if (module == null) {
             LoggerUtil.logger.warn("尝试加载不存在的模块: $name")
@@ -52,7 +77,7 @@ class ModuleManager {
     /**
      * 卸载指定模块
      */
-    suspend fun unloadModule(name: String) {
+    suspend fun unload(name: String) {
         val module = modules[name]
         if (module == null) {
             LoggerUtil.logger.warn("尝试卸载不存在的模块: $name")
@@ -107,14 +132,14 @@ class ModuleManager {
      * 扩展方法：批量加载模块
      */
     fun ModuleManager.loadModules(vararg names: String) {
-        names.forEach { loadModule(it) }
+        names.forEach { load(it) }
     }
 
     /**
      * 扩展方法：批量卸载模块
      */
     suspend fun ModuleManager.unloadModules(vararg names: String) {
-        names.forEach { unloadModule(it) }
+        names.forEach { unload(it) }
     }
     /**
      * 关闭所有模块

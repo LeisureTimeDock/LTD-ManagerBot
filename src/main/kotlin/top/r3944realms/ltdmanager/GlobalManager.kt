@@ -22,7 +22,7 @@ object GlobalManager {
     }
 
     fun initApplication() {
-
+        moduleManager.loadConfig()
     }
 
     // NapCat 客户端

@@ -38,7 +38,7 @@ data class DgLabConfig(
             try {
                 encryptedLocalServerSslPassword = "ENC(${CryptoUtil.encrypt(encryptedLocalServerSslPassword!!)})"
                 YamlUpdater.updateYaml(
-                    YamlConfigLoader.configFilePath.toString(),
+                    YamlConfigLoader.appConfigFilePath.toString(),
                     "dg-lab.ws-server.encrypted-local-server-ssl-password",
                     encryptedLocalServerSslPassword!!
                 )

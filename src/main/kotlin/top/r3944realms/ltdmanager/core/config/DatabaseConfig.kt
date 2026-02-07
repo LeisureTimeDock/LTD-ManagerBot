@@ -37,7 +37,7 @@ data class DatabaseConfig(
         try {
             encryptedPassword = "ENC(${CryptoUtil.encrypt(encryptedPassword!!)})"
             YamlUpdater.updateYaml(
-                YamlConfigLoader.configFilePath.toString(),
+                YamlConfigLoader.appConfigFilePath.toString(),
                 "database.encrypted-password",
                 this.encryptedPassword!!
             )

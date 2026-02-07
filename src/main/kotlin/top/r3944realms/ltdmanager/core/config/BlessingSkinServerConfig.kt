@@ -38,7 +38,7 @@ data class BlessingSkinServerConfig(
                 try {
                     encryptedToken = "ENC(${CryptoUtil.encrypt(encryptedToken!!)})"
                     YamlUpdater.updateYaml(
-                        YamlConfigLoader.configFilePath.toString(),
+                        YamlConfigLoader.appConfigFilePath.toString(),
                         "blessing-skin-server.invitation-api.encrypted-token",
                         encryptedToken!!
                     )

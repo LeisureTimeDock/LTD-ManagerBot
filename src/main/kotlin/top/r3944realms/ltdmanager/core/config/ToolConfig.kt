@@ -38,7 +38,7 @@ data class ToolConfig(
             try {
                 rconPassword = "ENC(${CryptoUtil.encrypt(rconPassword!!)})"
                 YamlUpdater.updateYaml(
-                    YamlConfigLoader.configFilePath.toString(),
+                    YamlConfigLoader.appConfigFilePath.toString(),
                     "tools.rcon.rcon-password",
                     rconPassword!!
                 )

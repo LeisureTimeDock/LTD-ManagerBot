@@ -137,7 +137,7 @@ class GroupRequestHandlerModule(
         try {
             getConnection().use { conn ->
                 val stmt = conn.prepareStatement(
-                    "SELECT status FROM minecraft_manager_ltd_8.players WHERE qq=?"
+                    "SELECT status FROM minecraft_manager_ltd_9.players WHERE qq=?"
                 )
                 stmt.setLong(1, actor)
                 val rs = stmt.executeQuery()

@@ -1,7 +1,6 @@
 package top.r394realms.ltdmanagertest
 
 import top.r3944realms.ltdmanager.GlobalManager
-import top.r3944realms.ltdmanager.module.GroupRequestHandlerModule
 import top.r3944realms.ltdmanager.module.StateModule
 
 
@@ -15,8 +14,8 @@ fun main() = GlobalManager.runBlockingMain {
 
 
     // 注册模块到全局模块管理器
-    GlobalManager.moduleManager.registerModule(stateModule)
+    GlobalManager.moduleManager.register(stateModule)
 
     // 加载模块
-    GlobalManager.moduleManager.loadModule(stateModule.name)
+    GlobalManager.moduleManager.load(stateModule.name)
 }

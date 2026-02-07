@@ -34,7 +34,7 @@ data class MailConfig(
         try {
             encryptedPassword = "ENC(${CryptoUtil.encrypt(encryptedPassword!!)})"
             YamlUpdater.updateYaml(
-                YamlConfigLoader.configFilePath.toString(),
+                YamlConfigLoader.appConfigFilePath.toString(),
                 "mail.encrypted-password",
                 this.encryptedPassword!!
             )

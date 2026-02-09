@@ -20,6 +20,7 @@ object ModuleFactory {
             STATE_MODULE -> createState(config)
             MOD_GROUP_HANDLER_MODULE -> createModGroupHandler(config)
             HELP_MODULE -> createHelpModule(config)
+            UNKNOWN_MODULE -> throw ConfigError(ConfigError.Type.INVALID_PARAMETER, "unknown module")
         }
     }
     private fun resolveDependency(dep: ModuleConfig.Module.Dependency?, name: String): BaseModule? {
@@ -176,7 +177,6 @@ object ModuleFactory {
     private fun createHelpModule(config: ModuleConfig.Module): HelpModule {
         val selfId = config.long("self-id")
         val cooldownMillis = config.getOrDefault("cooldown-millis", 10_000L)
-        config.getOrDefault("rcon-timeout-millis", 2_000L)
         val groupMessagePollingModule = resolveDependency(config.findDependency(GROUP_MESSAGE_POLLING_MODULE), "groupMessagePolling") as GroupMessagePollingModule
         val selfNickName = config.string("self-nick-name")
         val keywords = config.stringList("keywords")

@@ -10,21 +10,19 @@ data class ModuleConfig(
         var name: String = "default",
         var type: ModuleType = ModuleType.HELP_MODULE,
         var enabled: Boolean = true,
-        var dependencies: List<Dependency> = emptyList(),
+        var dependencies: List<Dependency>? = emptyList(),
         var config: Map<String, Any> = emptyMap()
     ) {
         data class Dependency(
-            var name: String,
-            var type: ModuleType
+            var name: String = "unknown",
+            var type: ModuleType = ModuleType.UNKNOWN_MODULE,
         ) {
-            private val dependencyName: String = "${type.modName}-$name"
-
-            fun getDepName() :String = dependencyName
+            fun getDepName() :String = "${type.modName}-#$name"
 
         }
 
         fun findDependency(type: ModuleType): Dependency? {
-            return dependencies.find { it.type == type }
+            return dependencies?.find { it.type == type }
         }
         inline fun <reified T> typedList(paramName: String): List<T> {
             val list = anyList(paramName)
@@ -125,7 +123,8 @@ data class ModuleConfig(
             MOD_GROUP_HANDLER_MODULE(Modules.MOD_GROUP_HANDLER),
             RCON_PLAYER_LIST_MODULE(Modules.RCON_PLAYER_LIST),
             STATE_MODULE(Modules.STATE),
-            HELP_MODULE(Modules.HELP),;
+            HELP_MODULE(Modules.HELP),
+            UNKNOWN_MODULE("UnknownModule");
         }
         // 基础获取方法
         fun value(paramName: String): Any =
